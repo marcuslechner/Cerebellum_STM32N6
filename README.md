@@ -99,6 +99,57 @@ STM32_Programmer_CLI -c port=SWD -el <external_loader>.stldr \
 
 The correct `.stldr` depends on which flash part is on your board (Discovery kit ships with one; custom boards need a matching loader).
 
+### Debug
+
+**Current debug workflow: dev boot over SWD with ST-LINK**
+
+This repo currently debugs the FSBL image from internal SRAM in development boot mode rather than from external flash. The working VS Code flow is:
+
+1. Put the board in **development boot** mode.
+2. Build the ELF with `cmake --build build`.
+3. Start the `STM32N6 Dev Boot (ST-LINK)` configuration from `.vscode/launch.json`.
+4. Let GDB attach, halt the core, load `build/cerebellum.elf` into SRAM, set the PC to `Reset_Handler`, break at `main`, and continue.
+
+Why this is not the default ST-LINK flow:
+
+- On STM32N6, the stock `cortex-debug` + `ST-LINK_gdbserver` launch path is not enough on its own for dev-boot debugging.
+- The N6 needs **AP/port 1** selected, so the launch config passes `-m 1` to `ST-LINK_gdbserver`.
+- `cortex-debug` always appends `--halt` for the ST-LINK server. On this target, that can fail during the boot-ROM handshake in dev-boot mode, so `tools/stlink-gdbserver-devboot.sh` strips `--halt` before launching the real server.
+- The actual session then uses `attach` plus post-attach GDB commands instead of a normal reset-and-run flow.
+
+**Fallback workflow: manual GDB server**
+
+If the built-in ST-LINK launch path regresses, use the `STM32N6 Dev Boot (Manual GDB Server)` configuration and start the server yourself first:
+
+```bash
+/opt/st/stm32cubeclt_1.21.0/STLink-gdb-server/bin/ST-LINK_gdbserver \
+  -p 50000 \
+  -cp /opt/st/stm32cubeclt_1.21.0/STM32CubeProgrammer/bin \
+  --swd \
+  --attach \
+  -m 1
+```
+
+Then attach from VS Code using the manual configuration, which connects to `localhost:50000`.
+
+**What success looks like**
+
+- GDB connects cleanly and no longer fails during session creation.
+- Live Watch traffic such as `var-update --all-values *` with `^done,changelist=[]` is normal and only means the debugger is polling watched values.
+- Source-level stepping, register inspection, memory inspection, and breakpoints work as expected.
+
+**Known limitation: no SWO/ITM console output in the current setup**
+
+- The project can compile `printf()` routed through ITM, but in the current VS Code setup there is no visible SWO output path.
+- The installed `marus25.cortex-debug` extension does not currently provide SWO capture for the ST-LINK GDB server path we are using.
+- As a result, `printf("Hello world!")` sent through ITM is not expected to appear in the VS Code Debug Console or terminal with the current configuration.
+
+**Recommended next steps**
+
+- Keep the current dev-boot workflow for code loading, stepping, and bring-up.
+- Treat SWO/ITM text output as unavailable in this exact tool combination until the debugger stack changes.
+- When console-style firmware logging becomes important, evaluate a dedicated output path separately from this debug flow: semihosting, UART, or a debugger/server combination with confirmed SWO support on STM32N6.
+
 ### Changing Pin/Peripheral Configuration
 
 1. Open `cerebellum.ioc` in STM32CubeMX.

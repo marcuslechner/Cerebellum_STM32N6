@@ -23,6 +23,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <stdio.h>
 
 /* USER CODE END Includes */
 
@@ -56,6 +57,10 @@ static void MX_GPIO_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+int __io_putchar(int ch)
+{
+  return (int)ITM_SendChar((uint32_t)ch);
+}
 
 /* USER CODE END 0 */
 
@@ -104,7 +109,6 @@ int main(void)
   MX_GPIO_Init();
   /* USER CODE BEGIN 2 */
 
-
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -116,7 +120,9 @@ int main(void)
     /* USER CODE BEGIN 3 */
     HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
     /* Insert delay 100 ms */
-    HAL_Delay(100);
+    HAL_Delay(500);
+    printf("Hello world!\r\n");
+
 
   }
   /* USER CODE END 3 */
