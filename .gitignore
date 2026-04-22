@@ -1,0 +1,83 @@
+# ----- Build output -----
+build/
+out/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+.ninja_deps
+.ninja_log
+
+# ----- Compiler / linker artifacts -----
+*.o
+*.obj
+*.d
+*.a
+*.elf
+*.axf
+*.bin
+*.hex
+*.srec
+*.map
+*.list
+*.lst
+*.lss
+*.su
+*.gcno
+*.gcda
+
+# ----- Debug / runtime -----
+*.gdb_history
+.gdb_history
+core
+*.core
+
+# ----- STM32CubeMX -----
+# Keep .ioc committed; ignore backups and scratch files.
+*.ioc.bak
+*.bak
+~$*
+*.tmp
+.mxproject.bak
+
+# ----- STM32CubeIDE (if ever opened accidentally) -----
+.cproject
+.project
+.settings/
+.launch
+Debug/
+Release/
+
+# ----- VS Code (keep shared configs if you add them) -----
+.vscode/*
+!.vscode/launch.json
+!.vscode/tasks.json
+!.vscode/settings.json
+!.vscode/c_cpp_properties.json
+!.vscode/extensions.json
+
+# ----- JetBrains / CLion -----
+.idea/
+
+# ----- OS -----
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ----- Python (for tools/) -----
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ----- Misc -----
+*.log
+*.pdb
+
+# ----- Large reference docs (keep local, don't push) -----
+# ST PDFs are freely downloadable; see docs/INDEX.md for the list.
+*.pdf
