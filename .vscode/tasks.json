@@ -76,6 +76,32 @@
       "problemMatcher": []
     },
     {
+      "label": "Dev Boot Load ELF to SRAM",
+      "type": "shell",
+      "command": "STM32_Programmer_CLI",
+      "args": [
+        "-c",
+        "port=SWD",
+        "mode=HOTPLUG",
+        "-d",
+        "build/cerebellum.elf",
+        "-s"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Build + Dev Boot Load ELF to SRAM",
+      "dependsOn": [
+        "CMake Build",
+        "Dev Boot Load ELF to SRAM"
+      ],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
       "label": "Flash External OSPI",
       "type": "shell",
       "command": "STM32_Programmer_CLI",

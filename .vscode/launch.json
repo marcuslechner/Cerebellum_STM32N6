@@ -4,17 +4,58 @@
     {
       "name": "STM32N6 Dev Boot (ST-LINK)",
       "type": "cortex-debug",
-      "request": "launch",
+      "request": "attach",
       "cwd": "${workspaceFolder}",
       "servertype": "stlink",
       "interface": "swd",
-      "device": "STM32N657X0H3Q",
-      "armToolchainPath": "/usr/bin",
-      "executable": "${command:cmake.launchTargetPath}",
-      "runToEntryPoint": "main",
+      "device": "STM32N657X0HxQ",
+      "serverpath": "${workspaceFolder}/tools/stlink-gdbserver-devboot.sh",
+      "armToolchainPath": "/opt/st/stm32cubeclt_1.21.0/GNU-tools-for-STM32/bin",
+      "gdbPath": "/opt/st/stm32cubeclt_1.21.0/GNU-tools-for-STM32/bin/arm-none-eabi-gdb",
+      "stm32cubeprogrammer": "/opt/st/stm32cubeclt_1.21.0/STM32CubeProgrammer/bin",
+      "serverArgs": [
+        "-m",
+        "1"
+      ],
+      "executable": "${workspaceFolder}/build/cerebellum.elf",
       "preLaunchTask": "CMake Build",
+      "showDevDebugOutput": "raw",
+      "postAttachCommands": [
+        "monitor halt",
+        "load",
+        "set $pc = Reset_Handler",
+        "tbreak main",
+        "continue"
+      ],
       "liveWatch": {
-        "enabled": true
+        "enabled": true,
+        "samplesPerSecond": 4
+      }
+    },
+    {
+      "name": "STM32N6 Dev Boot (Manual GDB Server)",
+      "type": "cortex-debug",
+      "request": "attach",
+      "cwd": "${workspaceFolder}",
+      "servertype": "external",
+      "gdbTarget": "localhost:50000",
+      "device": "STM32N657X0HxQ",
+      "armToolchainPath": "/opt/st/stm32cubeclt_1.21.0/GNU-tools-for-STM32/bin",
+      "gdbPath": "/opt/st/stm32cubeclt_1.21.0/GNU-tools-for-STM32/bin/arm-none-eabi-gdb",
+      "executable": "${workspaceFolder}/build/cerebellum.elf",
+      "preLaunchTask": "CMake Build",
+      "showDevDebugOutput": "raw",
+      "overrideAttachCommands": [],
+      "postAttachCommands": [
+        "monitor halt",
+        "load",
+        "set $pc = Reset_Handler",
+        "tbreak main",
+        "continue"
+      ],
+      "liveWatch": {
+        "enabled": true,
+        "samplesPerSecond": 4
       }
     }
   ]

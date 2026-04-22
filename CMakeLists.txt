@@ -39,6 +39,8 @@ add_executable(${PROJECT_NAME}
   ${MODEL_SOURCES}
 )
 
+set_target_properties(${PROJECT_NAME} PROPERTIES SUFFIX ".elf")
+
 target_include_directories(${PROJECT_NAME} PRIVATE
   Core/Inc
   Application/Inc
