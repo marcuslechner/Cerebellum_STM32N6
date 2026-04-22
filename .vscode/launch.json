@@ -8,7 +8,7 @@
       "cwd": "${workspaceFolder}",
       "servertype": "stlink",
       "interface": "swd",
-      "device": "STM32N657ZOH",
+      "device": "STM32N657X0H3Q",
       "armToolchainPath": "/usr/bin",
       "executable": "${command:cmake.launchTargetPath}",
       "runToEntryPoint": "main",
