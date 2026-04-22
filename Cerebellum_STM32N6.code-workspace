@@ -1,0 +1,174 @@
+{
+  "folders": [
+    {
+      "name": "Cerebellum_STM32N6",
+      "path": "."
+    }
+  ],
+  "settings": {
+    "cmake.generator": "Ninja",
+    "cmake.configureOnOpen": false,
+    "cmake.sourceDirectory": "${workspaceFolder}",
+    "cmake.buildDirectory": "${workspaceFolder}/build",
+    "cmake.configureSettings": {
+      "CMAKE_TOOLCHAIN_FILE": "${workspaceFolder}/cmake/arm-none-eabi.cmake",
+      "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+    },
+    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+    "C_Cpp.default.compileCommands": "${workspaceFolder}/build/compile_commands.json",
+    "C_Cpp.default.compilerPath": "/usr/bin/arm-none-eabi-gcc",
+    "C_Cpp.default.intelliSenseMode": "gcc-arm",
+    "C_Cpp.default.includePath": [
+      "${workspaceFolder}/Application/Inc",
+      "${workspaceFolder}/Core/Inc",
+      "${workspaceFolder}/Drivers/**",
+      "${workspaceFolder}/Middlewares/**",
+      "${workspaceFolder}/STM32Cube_FW_N6_V1.3.0/Drivers/**",
+      "${workspaceFolder}/STM32Cube_FW_N6_V1.3.0/Middlewares/**",
+      "${workspaceFolder}/Models"
+    ],
+    "C_Cpp.default.defines": [
+      "USE_HAL_DRIVER",
+      "STM32N657xx"
+    ],
+    "C_Cpp.default.cStandard": "c11",
+    "files.exclude": {
+      "**/build": true
+    },
+    "search.exclude": {
+      "**/build": true
+    }
+  },
+  "extensions": {
+    "recommendations": [
+      "ms-vscode.cpptools",
+      "ms-vscode.cmake-tools",
+      "marus25.cortex-debug"
+    ]
+  },
+  "launch": {
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "name": "STM32N6 Dev Boot (ST-LINK)",
+        "type": "cortex-debug",
+        "request": "launch",
+        "cwd": "${workspaceFolder}",
+        "servertype": "stlink",
+        "interface": "swd",
+        "device": "STM32N657ZOH",
+        "armToolchainPath": "/usr/bin",
+        "executable": "${command:cmake.launchTargetPath}",
+        "runToEntryPoint": "main",
+        "preLaunchTask": "CMake Build",
+        "liveWatch": {
+          "enabled": true
+        }
+      }
+    ]
+  },
+  "tasks": {
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "CMake Configure Debug",
+        "type": "shell",
+        "command": "cmake",
+        "args": [
+          "-S",
+          ".",
+          "-B",
+          "build",
+          "-G",
+          "Ninja",
+          "-DCMAKE_TOOLCHAIN_FILE=${workspaceFolder}/cmake/arm-none-eabi.cmake",
+          "-DCMAKE_BUILD_TYPE=Debug",
+          "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
+        ],
+        "options": {
+          "cwd": "${workspaceFolder}"
+        },
+        "problemMatcher": []
+      },
+      {
+        "label": "CMake Configure Release",
+        "type": "shell",
+        "command": "cmake",
+        "args": [
+          "-S",
+          ".",
+          "-B",
+          "build",
+          "-G",
+          "Ninja",
+          "-DCMAKE_TOOLCHAIN_FILE=${workspaceFolder}/cmake/arm-none-eabi.cmake",
+          "-DCMAKE_BUILD_TYPE=Release",
+          "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
+        ],
+        "options": {
+          "cwd": "${workspaceFolder}"
+        },
+        "problemMatcher": []
+      },
+      {
+        "label": "CMake Build",
+        "type": "shell",
+        "command": "cmake",
+        "args": [
+          "--build",
+          "build"
+        ],
+        "options": {
+          "cwd": "${workspaceFolder}"
+        },
+        "group": {
+          "kind": "build",
+          "isDefault": true
+        },
+        "problemMatcher": [
+          "$gcc"
+        ]
+      },
+      {
+        "label": "CMake Clean",
+        "type": "shell",
+        "command": "cmake",
+        "args": [
+          "--build",
+          "build",
+          "--target",
+          "clean"
+        ],
+        "options": {
+          "cwd": "${workspaceFolder}"
+        },
+        "problemMatcher": []
+      },
+      {
+        "label": "Flash External OSPI",
+        "type": "shell",
+        "command": "STM32_Programmer_CLI",
+        "args": [
+          "-c",
+          "port=SWD",
+          "-el",
+          "${input:externalLoader}",
+          "-w",
+          "build/cerebellum.bin",
+          "0x70000000"
+        ],
+        "options": {
+          "cwd": "${workspaceFolder}"
+        },
+        "problemMatcher": []
+      }
+    ],
+    "inputs": [
+      {
+        "id": "externalLoader",
+        "type": "promptString",
+        "description": "Path to the STM32 external flash loader (.stldr) for your board"
+      }
+    ]
+  }
+}

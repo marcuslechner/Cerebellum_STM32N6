@@ -1,0 +1,23 @@
+{
+  "version": 4,
+  "configurations": [
+    {
+      "name": "STM32N6",
+      "compilerPath": "/usr/bin/arm-none-eabi-gcc",
+      "intelliSenseMode": "gcc-arm",
+      "compileCommands": "${workspaceFolder}/build/compile_commands.json",
+      "includePath": [
+        "${workspaceFolder}/Application/Inc",
+        "${workspaceFolder}/Core/Inc",
+        "${workspaceFolder}/Drivers/**",
+        "${workspaceFolder}/Middlewares/**",
+        "${workspaceFolder}/Models"
+      ],
+      "defines": [
+        "USE_HAL_DRIVER",
+        "STM32N657xx"
+      ],
+      "cStandard": "c11"
+    }
+  ]
+}

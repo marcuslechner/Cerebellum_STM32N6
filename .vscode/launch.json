@@ -1,0 +1,21 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "STM32N6 Dev Boot (ST-LINK)",
+      "type": "cortex-debug",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "servertype": "stlink",
+      "interface": "swd",
+      "device": "STM32N657ZOH",
+      "armToolchainPath": "/usr/bin",
+      "executable": "${command:cmake.launchTargetPath}",
+      "runToEntryPoint": "main",
+      "preLaunchTask": "CMake Build",
+      "liveWatch": {
+        "enabled": true
+      }
+    }
+  ]
+}

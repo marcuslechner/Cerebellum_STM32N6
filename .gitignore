@@ -32,6 +32,10 @@ cmake_install.cmake
 core
 *.core
 
+# ----- STM32N6-DK -----
+
+STM32Cube_FW_N6*/
+
 # ----- STM32CubeMX -----
 # Keep .ioc committed; ignore backups and scratch files.
 *.ioc.bak
