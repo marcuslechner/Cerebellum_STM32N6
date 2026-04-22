@@ -81,3 +81,6 @@ __pycache__/
 # ----- Large reference docs (keep local, don't push) -----
 # ST PDFs are freely downloadable; see docs/INDEX.md for the list.
 *.pdf
+
+# ----- Local Codex scratch files -----
+.codex
