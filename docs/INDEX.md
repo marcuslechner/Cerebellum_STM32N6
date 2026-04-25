@@ -4,6 +4,13 @@ ST reference documentation for STM32N657 / Nucleo-N657 / STM32CubeN6. PDFs are `
 
 Search [st.com](https://www.st.com) by the document number (e.g. `RM0486`) to find the latest revision. All are free downloads.
 
+## IMU
+
+- **LSM6DSOX** — selected project IMU.
+- Local notes/index: `docs/LSM6DSOX/LSM6DSOX.md`
+- Local datasheet copy: `docs/LSM6DSOX/LSM6DSOX.pdf` (PDF is gitignored)
+- ST reference code location in this repo: `reference/lsm6dsox_STdC`
+
 ## Core MCU
 
 - **RM0486** — STM32N647/657xx Arm-based 32-bit MCUs reference manual. Primary register / peripheral reference.
@@ -11,7 +18,9 @@ Search [st.com](https://www.st.com) by the document number (e.g. `RM0486`) to fi
 
 ## Board
 
-- **UM3417** — STM32N6 Nucleo-144 board (MB1940) user manual. Pinout, jumpers, ST-LINK/V3E.
+- **STM32N6 Nucleo-144 board (NUCLEO-N657X0-Q / MB1940)**:
+  **UM3417** user manual. Primary reference for pinout, jumpers, ST-LINK/V3E.
+- Local board manual copy: `docs/um3417-stm32n6-nucleo144-board-mb1940-stmicroelectronics-2.pdf`
 - **NUCLEO-N657X0-Q product flyer** (`nucleo-n657x0-q-1.pdf`) — board feature summary.
 
 ## STM32CubeN6 MCU package

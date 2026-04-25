@@ -19,6 +19,14 @@ End-to-end flow:
 
 See `wheel_drive.md` for MCU, IMU, and algorithm details.
 
+## Current IMU
+
+- Selected IMU: **LSM6DSOX**
+- Interface: **SPI**
+- Local IMU docs and notes: `docs/LSM6DSOX/LSM6DSOX.md`
+- Local datasheet copy (gitignored): `docs/LSM6DSOX/LSM6DSOX.pdf`
+- ST reference code snapshot: `reference/lsm6dsox_STdC`
+
 ## Project Layout
 
 - `Core/Src/`, `Core/Inc/`, `Core/Startup/` — canonical bring-up base imported from ST's `NUCLEO-N657X0-Q/GPIO_IOToggle` example and now maintained by hand in this repo.

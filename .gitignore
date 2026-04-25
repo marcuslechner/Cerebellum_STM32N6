@@ -106,3 +106,6 @@ cubemx-reference/**
 !cubemx-reference/
 !cubemx-reference/*/
 !cubemx-reference/**/*.ioc
+
+# ----- Third-party reference code (downloaded locally, don't push) -----
+reference/
