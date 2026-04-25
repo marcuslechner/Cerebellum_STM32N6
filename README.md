@@ -30,6 +30,7 @@ See `wheel_drive.md` for MCU, IMU, and algorithm details.
 - `docs/` — design notes, datasheets.
 - `tools/` — flashing scripts, model conversion, host-side helpers.
 - `cerebellum.ioc` — STM32CubeMX reference file for pin/peripheral planning and cross-checking. It is committed, but it is not the source of truth for in-repo code generation.
+- `cubemx-reference/` — local CubeMX-generated reference projects used to extract init code into the hand-maintained tree. Only the `.ioc` files are committed; all regenerated C/H output is gitignored. See *Changing Pin/Peripheral Configuration* below.
 
 This repo is already seeded with a minimal, known-good board bring-up project. The normal workflow is CMake + Ninja + VS Code; CubeMX is used as a reference tool, not as an in-repo code generator.
 
@@ -158,8 +159,39 @@ Then attach from VS Code using the manual configuration, which connects to `loca
 1. Open `cerebellum.ioc` in STM32CubeMX to validate pin muxing, clocks, labels, and peripheral settings.
 2. Do **not** use **Generate Code** in this repo. The committed project layout is not a round-trippable STM32N6 CubeMX output tree.
 3. Apply the required init changes manually in `Core/` or `Application/`, keeping the CMake build as the source of truth.
-4. If you want CubeMX scaffolding for a new peripheral, generate a throwaway scratch project outside this repo and copy only the relevant init code back in.
+4. If you want CubeMX scaffolding for a new peripheral, use the `cubemx-reference/` workflow below instead of cooking from scratch.
 5. Rebuild with `cmake --build build`.
+
+#### Using `cubemx-reference/` to port CubeMX scaffolding
+
+Rather than generating a throwaway project somewhere outside the repo, keep CubeMX-generated reference trees in `cubemx-reference/`. The directory is gitignored except for `.ioc` files, so the *plan* is versioned but the regenerated C/H is not.
+
+Recommended layout:
+
+```
+cubemx-reference/
+├── baseline/                 # current cerebellum.ioc, no new peripheral
+│   ├── baseline.ioc          ← committed
+│   └── (CubeMX output)       ← gitignored
+└── <feature-name>/           # baseline + the one peripheral you're adding
+    ├── <feature-name>.ioc    ← committed
+    └── (CubeMX output)       ← gitignored
+```
+
+Workflow for adding a peripheral:
+
+1. In CubeMX, save the current `cerebellum.ioc` as `cubemx-reference/baseline/baseline.ioc` (if you don't already have one) and **Generate Code** there.
+2. Make a sibling folder, e.g. `cubemx-reference/uart1-debug/`, copy the `.ioc` in, enable only the new peripheral, and **Generate Code** there.
+3. Diff the two trees to isolate exactly what the peripheral added:
+
+   ```bash
+   diff -ruN cubemx-reference/baseline cubemx-reference/uart1-debug > /tmp/cubemx.diff
+   ```
+4. Hand-port the relevant init bodies, MSP callbacks, and clock-tree changes into `Core/` or `Application/`. Do **not** copy CubeIDE project files, `Drivers/` updates, or scaffolding markers.
+5. Update the actual `cerebellum.ioc` at the repo root to match, so the committed plan stays in sync.
+6. Rebuild with `cmake --build build`.
+
+Capture the CubeMX and HAL versions you used in `docs/cubemx-regen-notes.md` so future regenerations stay reproducible.
 
 ### Deploying an NPU Model
 
