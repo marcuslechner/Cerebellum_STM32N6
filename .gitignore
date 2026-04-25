@@ -42,7 +42,16 @@ STM32Cube_FW_N6*/
 *.bak
 ~$*
 *.tmp
+.mxproject
 .mxproject.bak
+CMakePresets.json
+FSBL/
+Appli/
+AppNS/
+ExtMemLoader/
+EWARM/
+MDK-ARM/
+Makefile/
 
 # ----- STM32CubeIDE (if ever opened accidentally) -----
 .cproject
@@ -88,3 +97,12 @@ __pycache__/
 
 # ----- Local Codex scratch files -----
 .codex
+
+# ----- CubeMX reference projects -----
+# Throwaway CubeMX-generated trees used to extract init code into the
+# hand-maintained repo. Keep the .ioc files (the planning source) and
+# ignore everything regenerated from them.
+cubemx-reference/**
+!cubemx-reference/
+!cubemx-reference/*/
+!cubemx-reference/**/*.ioc

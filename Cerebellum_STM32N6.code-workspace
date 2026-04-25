@@ -23,8 +23,6 @@
       "${workspaceFolder}/Core/Inc",
       "${workspaceFolder}/Drivers/**",
       "${workspaceFolder}/Middlewares/**",
-      "${workspaceFolder}/STM32Cube_FW_N6_V1.3.0/Drivers/**",
-      "${workspaceFolder}/STM32Cube_FW_N6_V1.3.0/Middlewares/**",
       "${workspaceFolder}/Models"
     ],
     "C_Cpp.default.defines": [
@@ -33,10 +31,12 @@
     ],
     "C_Cpp.default.cStandard": "c11",
     "files.exclude": {
-      "**/build": true
+      "**/build": true,
+      "**/STM32Cube_FW_N6*": true
     },
     "search.exclude": {
-      "**/build": true
+      "**/build": true,
+      "**/STM32Cube_FW_N6*": true
     }
   },
   "extensions": {

@@ -21,7 +21,7 @@ See `wheel_drive.md` for MCU, IMU, and algorithm details.
 
 ## Project Layout
 
-- `Core/Src/`, `Core/Inc/`, `Core/Startup/` — current FSBL bring-up base imported from ST's `NUCLEO-N657X0-Q/GPIO_IOToggle` example.
+- `Core/Src/`, `Core/Inc/`, `Core/Startup/` — canonical bring-up base imported from ST's `NUCLEO-N657X0-Q/GPIO_IOToggle` example and now maintained by hand in this repo.
 - `Drivers/` — imported HAL + CMSIS content required by the board example.
 - `Middlewares/` — optional CubeMX-managed middleware (USBX, ThreadX, etc.) when the project grows beyond the seed example.
 - `Application/Src/`, `Application/Inc/` — balancing algorithm, IMU driver, motor control, USB protocol. Application code that CubeMX never touches.
@@ -29,9 +29,9 @@ See `wheel_drive.md` for MCU, IMU, and algorithm details.
 - `cmake/arm-none-eabi.cmake` — bare-metal toolchain file (Cortex-M55 + Helium).
 - `docs/` — design notes, datasheets.
 - `tools/` — flashing scripts, model conversion, host-side helpers.
-- `cerebellum.ioc` — STM32CubeMX project configuration, seeded from the NUCLEO board example instead of created from scratch.
+- `cerebellum.ioc` — STM32CubeMX reference file for pin/peripheral planning and cross-checking. It is committed, but it is not the source of truth for in-repo code generation.
 
-This repo is already seeded with a minimal, known-good board bring-up project. We can now evolve it in CubeMX instead of starting from an empty `.ioc`.
+This repo is already seeded with a minimal, known-good board bring-up project. The normal workflow is CMake + Ninja + VS Code; CubeMX is used as a reference tool, not as an in-repo code generator.
 
 ## Development Setup
 
@@ -43,7 +43,7 @@ sudo apt install gcc-arm-none-eabi cmake ninja-build openocd
 
 Also install:
 
-- [STM32CubeMX](https://www.st.com/en/development-tools/stm32cubemx.html) — pin/peripheral configuration.
+- [STM32CubeMX](https://www.st.com/en/development-tools/stm32cubemx.html) — optional, used for pin/peripheral review and sanity-checking the `.ioc`.
 - [STM32CubeProgrammer](https://www.st.com/en/development-tools/stm32cubeprog.html) — N6 flashing. Required because the N6 boots from external Octo-SPI flash and needs the external-flash loader; OpenOCD support for N6 is still catching up.
 - [STM32Cube AI Studio](https://www.st.com/en/development-tools/stedgeai-cubeai.html) (`STEDGEAI-CUBEAI`) — standalone desktop tool for converting ONNX/TFLite models to Neural-ART NPU-optimized C code. Replaces the older X-CUBE-AI CubeMX expansion package. Both sit on ST Edge AI Core under the hood.
 - [ST Edge AI Developer Cloud](https://stedgeai-dc.st.com/) (optional) — browser-based alternative to AI Studio for quick model evaluation against the Neural-ART target without a local install.
@@ -56,6 +56,8 @@ Also install:
 
 When CMake Tools prompts for a kit, choose **"GCC arm-none-eabi"** or let it use the toolchain file.
 
+This repo intentionally uses a lean CMake-based VS Code workflow instead of CubeMX-generated IDE project files. That keeps the workspace small, reproducible, and easier to reason about.
+
 ### Target Hardware
 
 - Current bring-up base: **NUCLEO-N657X0-Q** with **STM32N657X0H3Q**
@@ -63,10 +65,11 @@ When CMake Tools prompts for a kit, choose **"GCC arm-none-eabi"** or let it use
 
 ### First-Time Project Setup
 
-1. Open `cerebellum.ioc` in STM32CubeMX. It is based on `Projects/NUCLEO-N657X0-Q/Examples/GPIO/GPIO_IOToggle`.
-2. In **Project Manager → Toolchain/IDE**, switch the project to **CMake** if CubeMX is not already set that way on your machine.
-3. Make board/peripheral changes in the `.ioc` instead of creating a fresh project.
-4. Regenerate code as needed, then keep `Application/` and `Models/` wired into `CMakeLists.txt`.
+1. Configure the project with CMake and Ninja.
+2. Build once to generate `compile_commands.json` for editor integration.
+3. Open the workspace in VS Code and use the provided tasks / launch configuration.
+4. Keep `Core/`, `Application/`, `Models/`, and `CMakeLists.txt` as the source of truth.
+5. Use `cerebellum.ioc` only as a hardware-planning reference when adding or validating peripherals.
 
 ### Build
 
@@ -152,10 +155,10 @@ Then attach from VS Code using the manual configuration, which connects to `loca
 
 ### Changing Pin/Peripheral Configuration
 
-1. Open `cerebellum.ioc` in STM32CubeMX.
-2. Make changes, click **Generate Code**.
-3. CubeMX regenerates files in `Core/Src/` but preserves `/* USER CODE BEGIN */` / `/* USER CODE END */` blocks.
-4. Application code in `Application/` is never touched by CubeMX.
+1. Open `cerebellum.ioc` in STM32CubeMX to validate pin muxing, clocks, labels, and peripheral settings.
+2. Do **not** use **Generate Code** in this repo. The committed project layout is not a round-trippable STM32N6 CubeMX output tree.
+3. Apply the required init changes manually in `Core/` or `Application/`, keeping the CMake build as the source of truth.
+4. If you want CubeMX scaffolding for a new peripheral, generate a throwaway scratch project outside this repo and copy only the relevant init code back in.
 5. Rebuild with `cmake --build build`.
 
 ### Deploying an NPU Model
