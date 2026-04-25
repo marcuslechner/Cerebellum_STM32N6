@@ -74,14 +74,27 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
-#define USR_BTN_Pin GPIO_PIN_13
-#define USR_BTN_GPIO_Port GPIOC
-#define LED2_Pin GPIO_PIN_0
-#define LED2_GPIO_Port GPIOG
-#define LED1_Pin GPIO_PIN_8
-#define LED1_GPIO_Port GPIOG
 
 /* USER CODE BEGIN Private defines */
+#ifndef BUTTON_USER_Pin
+#define BUTTON_USER_Pin GPIO_PIN_13
+#define BUTTON_USER_GPIO_Port GPIOC
+#endif
+
+#ifndef LED_BLUE_Pin
+#define LED_BLUE_Pin GPIO_PIN_8
+#define LED_BLUE_GPIO_Port GPIOG
+#endif
+
+#ifndef LED_RED_Pin
+#define LED_RED_Pin GPIO_PIN_10
+#define LED_RED_GPIO_Port GPIOG
+#endif
+
+#ifndef LED_GREEN_Pin
+#define LED_GREEN_Pin GPIO_PIN_0
+#define LED_GREEN_GPIO_Port GPIOG
+#endif
 
 /* USER CODE END Private defines */
 
