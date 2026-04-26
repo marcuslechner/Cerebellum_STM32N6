@@ -24,6 +24,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
+#include "lsm6dsox_imu.h"
 
 /* USER CODE END Includes */
 
@@ -34,6 +35,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define APP_IMU_ENABLE 0
 
 /* USER CODE END PD */
 
@@ -43,18 +45,26 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+#if (APP_IMU_ENABLE == 1U)
+SPI_HandleTypeDef hspi5;
+#endif
 
 /* USER CODE BEGIN PV */
-static uint8_t s_blink_blue_led = 1U;
-static GPIO_PinState s_prev_user_btn = GPIO_PIN_RESET;
-static uint32_t s_last_button_toggle_ms = 0U;
-static uint32_t s_last_blink_ms = 0U;
+#if (APP_IMU_ENABLE == 1U)
+static LSM6DSOX_RawSample s_last_imu_sample = {0};
+static uint8_t s_has_sample = 0U;
+static uint32_t s_samples_in_window = 0U;
+#endif
+static uint32_t s_last_report_ms = 0U;
 
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+#if (APP_IMU_ENABLE == 1U)
+static void MX_SPI5_Init(void);
+#endif
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -111,7 +121,54 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+#if (APP_IMU_ENABLE == 1U)
+  MX_SPI5_Init();
+#endif
   /* USER CODE BEGIN 2 */
+#if (APP_IMU_ENABLE == 1U)
+  uint8_t who_am_i = 0U;
+
+  if (LSM6DSOX_Init(&hspi5) != HAL_OK)
+  {
+    printf("LSM6DSOX init failed.\r\n");
+    Error_Handler();
+  }
+
+  if ((LSM6DSOX_ReadWhoAmI(&who_am_i) != HAL_OK) || (who_am_i != LSM6DSOX_WHO_AM_I_VALUE))
+  {
+    printf("LSM6DSOX WHO_AM_I mismatch: 0x%02X\r\n", who_am_i);
+    Error_Handler();
+  }
+
+  uint32_t drdy_wait_start_ms = HAL_GetTick();
+  uint32_t startup_drdy_count = 0U;
+  while ((HAL_GetTick() - drdy_wait_start_ms) < 250U)
+  {
+    startup_drdy_count += LSM6DSOX_TakeDrdyCount();
+    if (startup_drdy_count > 0U)
+    {
+      break;
+    }
+  }
+
+  if (startup_drdy_count == 0U)
+  {
+    printf("LSM6DSOX DRDY timeout during startup.\r\n");
+    Error_Handler();
+  }
+
+  if (LSM6DSOX_ReadRawSample(&s_last_imu_sample) != HAL_OK)
+  {
+    printf("LSM6DSOX first sample read failed.\r\n");
+    Error_Handler();
+  }
+  s_has_sample = 1U;
+
+  printf("LSM6DSOX bring-up ok. WHO_AM_I=0x%02X\r\n", who_am_i);
+#else
+  printf("IMU functionality disabled (APP_IMU_ENABLE=0).\r\n");
+#endif
+  s_last_report_ms = HAL_GetTick();
 
   /* USER CODE END 2 */
 
@@ -123,37 +180,47 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
     uint32_t now = HAL_GetTick();
-    GPIO_PinState btn_state = HAL_GPIO_ReadPin(BUTTON_USER_GPIO_Port, BUTTON_USER_Pin);
+#if (APP_IMU_ENABLE == 1U)
+    uint32_t pending_drdy = LSM6DSOX_TakeDrdyCount();
 
-    if ((btn_state == GPIO_PIN_SET) &&
-        (s_prev_user_btn == GPIO_PIN_RESET) &&
-        ((now - s_last_button_toggle_ms) >= 50U))
+    while (pending_drdy > 0U)
     {
-      s_blink_blue_led = (uint8_t)!s_blink_blue_led;
-      s_last_button_toggle_ms = now;
-
-      /* Reset both LEDs so only the selected LED blinks. */
-      HAL_GPIO_WritePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin, GPIO_PIN_RESET);
-      HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
-    }
-    s_prev_user_btn = btn_state;
-
-    if ((now - s_last_blink_ms) >= 1000U)
-    {
-      s_last_blink_ms = now;
-      if (s_blink_blue_led != 0U)
+      if (LSM6DSOX_ReadRawSample(&s_last_imu_sample) != HAL_OK)
       {
-        HAL_GPIO_TogglePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin);
-        HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
+        printf("LSM6DSOX sample read failed.\r\n");
+        Error_Handler();
+      }
+      s_has_sample = 1U;
+      s_samples_in_window++;
+      pending_drdy--;
+    }
+
+    if ((now - s_last_report_ms) >= 1000U)
+    {
+      s_last_report_ms = now;
+      HAL_GPIO_TogglePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin);
+
+      if (s_has_sample != 0U)
+      {
+        printf("drdy/s=%lu g=[%d,%d,%d] a=[%d,%d,%d]\r\n",
+               (unsigned long)s_samples_in_window,
+               s_last_imu_sample.gyro_x, s_last_imu_sample.gyro_y, s_last_imu_sample.gyro_z,
+               s_last_imu_sample.accel_x, s_last_imu_sample.accel_y, s_last_imu_sample.accel_z);
       }
       else
       {
-        HAL_GPIO_TogglePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin);
-        HAL_GPIO_WritePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin, GPIO_PIN_RESET);
+        printf("drdy/s=%lu (waiting for first sample)\r\n", (unsigned long)s_samples_in_window);
       }
-
-      printf("Hello world!\r\n");
+      s_samples_in_window = 0U;
     }
+#else
+    if ((now - s_last_report_ms) >= 1000U)
+    {
+      s_last_report_ms = now;
+      HAL_GPIO_TogglePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin);
+      printf("IMU disabled.\r\n");
+    }
+#endif
   }
   /* USER CODE END 3 */
 }
@@ -291,6 +358,47 @@ void SystemClock_Config(void)
 }
 
 /**
+  * @brief SPI5 Initialization Function
+  * @param None
+  * @retval None
+  */
+#if (APP_IMU_ENABLE == 1U)
+static void MX_SPI5_Init(void)
+{
+  hspi5.Instance = SPI5;
+  hspi5.Init.Mode = SPI_MODE_MASTER;
+  hspi5.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi5.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi5.Init.CLKPolarity = SPI_POLARITY_HIGH;
+  hspi5.Init.CLKPhase = SPI_PHASE_2EDGE;
+  hspi5.Init.NSS = SPI_NSS_SOFT;
+  hspi5.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32;
+  hspi5.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi5.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi5.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi5.Init.CRCPolynomial = 7;
+  hspi5.Init.CRCLength = SPI_CRC_LENGTH_DATASIZE;
+  hspi5.Init.NSSPMode = SPI_NSS_PULSE_DISABLE;
+  hspi5.Init.NSSPolarity = SPI_NSS_POLARITY_LOW;
+  hspi5.Init.FifoThreshold = SPI_FIFO_THRESHOLD_01DATA;
+  hspi5.Init.TxCRCInitializationPattern = SPI_CRC_INITIALIZATION_ALL_ZERO_PATTERN;
+  hspi5.Init.RxCRCInitializationPattern = SPI_CRC_INITIALIZATION_ALL_ZERO_PATTERN;
+  hspi5.Init.MasterSSIdleness = SPI_MASTER_SS_IDLENESS_00CYCLE;
+  hspi5.Init.MasterInterDataIdleness = SPI_MASTER_INTERDATA_IDLENESS_00CYCLE;
+  hspi5.Init.MasterReceiverAutoSusp = SPI_MASTER_RX_AUTOSUSP_DISABLE;
+  hspi5.Init.MasterKeepIOState = SPI_MASTER_KEEP_IO_STATE_DISABLE;
+  hspi5.Init.IOSwap = SPI_IO_SWAP_DISABLE;
+  hspi5.Init.ReadyMasterManagement = SPI_RDY_MASTER_MANAGEMENT_INTERNALLY;
+  hspi5.Init.ReadyPolarity = SPI_RDY_POLARITY_HIGH;
+
+  if (HAL_SPI_Init(&hspi5) != HAL_OK)
+  {
+    Error_Handler();
+  }
+}
+#endif
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -302,13 +410,33 @@ static void MX_GPIO_Init(void)
 /* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOC_CLK_ENABLE();
+  __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOG_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
+#if (APP_IMU_ENABLE == 1U)
+  HAL_GPIO_WritePin(IMU_CS_GPIO_Port, IMU_CS_Pin, GPIO_PIN_SET);
+#endif
   HAL_GPIO_WritePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin, GPIO_PIN_RESET);
   HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
   HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
+
+#if (APP_IMU_ENABLE == 1U)
+  /*Configure GPIO pin : IMU_CS_Pin */
+  GPIO_InitStruct.Pin = IMU_CS_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+  HAL_GPIO_Init(IMU_CS_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : IMU_INT_Pin */
+  GPIO_InitStruct.Pin = IMU_INT_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(IMU_INT_GPIO_Port, &GPIO_InitStruct);
+#endif
 
   /*Configure GPIO pin : BUTTON_USER_Pin */
   GPIO_InitStruct.Pin = BUTTON_USER_Pin;
@@ -323,11 +451,27 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
   HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
 
+#if (APP_IMU_ENABLE == 1U)
+  HAL_NVIC_SetPriority(EXTI12_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI12_IRQn);
+#endif
+
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+#if (APP_IMU_ENABLE == 1U)
+  if (GPIO_Pin == IMU_INT_Pin)
+  {
+    LSM6DSOX_OnDrdyInterrupt();
+  }
+#else
+  (void)GPIO_Pin;
+#endif
+}
 /* USER CODE END 4 */
 
 /**

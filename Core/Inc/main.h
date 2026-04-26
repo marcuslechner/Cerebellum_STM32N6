@@ -96,6 +96,16 @@ void Error_Handler(void);
 #define LED_GREEN_GPIO_Port GPIOG
 #endif
 
+#ifndef IMU_CS_Pin
+#define IMU_CS_Pin GPIO_PIN_3
+#define IMU_CS_GPIO_Port GPIOA
+#endif
+
+#ifndef IMU_INT_Pin
+#define IMU_INT_Pin GPIO_PIN_12
+#define IMU_INT_GPIO_Port GPIOD
+#endif
+
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

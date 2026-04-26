@@ -19,6 +19,7 @@ file(GLOB MODEL_SOURCES CONFIGURE_DEPENDS
 
 add_executable(${PROJECT_NAME}
   Core/Src/main.c
+  Core/Src/lsm6dsox_imu.c
   Core/Src/stm32n6xx_hal_msp.c
   Core/Src/stm32n6xx_it.c
   Core/Src/system_stm32n6xx_fsbl.c
@@ -35,6 +36,8 @@ add_executable(${PROJECT_NAME}
   Drivers/STM32N6xx_HAL_Driver/Src/stm32n6xx_hal_pwr_ex.c
   Drivers/STM32N6xx_HAL_Driver/Src/stm32n6xx_hal_rcc.c
   Drivers/STM32N6xx_HAL_Driver/Src/stm32n6xx_hal_rcc_ex.c
+  Drivers/STM32N6xx_HAL_Driver/Src/stm32n6xx_hal_spi.c
+  Drivers/STM32N6xx_HAL_Driver/Src/stm32n6xx_hal_spi_ex.c
   ${APPLICATION_SOURCES}
   ${MODEL_SOURCES}
 )

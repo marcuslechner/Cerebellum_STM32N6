@@ -76,5 +76,43 @@ void HAL_MspInit(void)
 }
 
 /* USER CODE BEGIN 1 */
+void HAL_SPI_MspInit(SPI_HandleTypeDef *hspi)
+{
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+  if (hspi->Instance == SPI5)
+  {
+    __HAL_RCC_SPI5_CLK_ENABLE();
+    __HAL_RCC_GPIOE_CLK_ENABLE();
+    __HAL_RCC_GPIOG_CLK_ENABLE();
+
+    /* SPI5_SCK on PE15 (AF5). */
+    GPIO_InitStruct.Pin = GPIO_PIN_15;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+    GPIO_InitStruct.Alternate = GPIO_AF5_SPI5;
+    HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
+
+    /* SPI5_MISO on PG1 and SPI5_MOSI on PG2 (AF5). */
+    GPIO_InitStruct.Pin = GPIO_PIN_1 | GPIO_PIN_2;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+    GPIO_InitStruct.Alternate = GPIO_AF5_SPI5;
+    HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
+  }
+}
+
+void HAL_SPI_MspDeInit(SPI_HandleTypeDef *hspi)
+{
+  if (hspi->Instance == SPI5)
+  {
+    __HAL_RCC_SPI5_CLK_DISABLE();
+
+    HAL_GPIO_DeInit(GPIOE, GPIO_PIN_15);
+    HAL_GPIO_DeInit(GPIOG, GPIO_PIN_1 | GPIO_PIN_2);
+  }
+}
 
 /* USER CODE END 1 */

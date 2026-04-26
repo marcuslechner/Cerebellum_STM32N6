@@ -41,6 +41,6 @@ Source: `cubemx-reference/cubemx-SPI5/cubemx-SPI5.ioc`
 
 - Keep upstream ST code in `reference/` as a reference snapshot.
 - Implement project-owned IMU interface in:
-  - `Application/Inc`
-  - `Application/Src`
+  - `Core/Inc`
+  - `Core/Src`
 - During bring-up, first verify `WHO_AM_I` and stable `drdy` interrupts, then increase SPI speed only if needed.

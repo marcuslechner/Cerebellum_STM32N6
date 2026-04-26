@@ -214,6 +214,20 @@ void SysTick_Handler(void)
 /* please refer to the startup file (startup_stm32n6xx.s).                    */
 /******************************************************************************/
 
-/* USER CODE BEGIN 1 */
+/**
+  * @brief This function handles EXTI line 12 interrupt.
+  */
+void EXTI12_IRQHandler(void)
+{
+  /* USER CODE BEGIN EXTI12_IRQn 0 */
 
+  /* USER CODE END EXTI12_IRQn 0 */
+  HAL_GPIO_EXTI_IRQHandler(IMU_INT_Pin);
+  /* USER CODE BEGIN EXTI12_IRQn 1 */
+
+  /* USER CODE END EXTI12_IRQn 1 */
+}
+
+/* USER CODE BEGIN 1 */
+	
 /* USER CODE END 1 */
