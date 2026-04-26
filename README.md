@@ -19,6 +19,12 @@ End-to-end flow:
 
 See `wheel_drive.md` for MCU, IMU, and algorithm details.
 
+## Current MCU
+
+- Selected MCU: **[STM32N657X0H3Q](https://www.st.com/en/microcontrollers-microprocessors/stm32n657x0.html)** (Cortex-M55 + Helium, Neural-ART NPU), **VFBGA264** package (14×14 mm, 0.8 mm pitch)
+- Bring-up board: **NUCLEO-N657X0-Q**
+- Boots from external Octo-SPI flash (no internal flash); see *Flash* and *Debug* below.
+
 ## Current IMU
 
 - Selected IMU: **LSM6DSOX**
@@ -69,7 +75,7 @@ This repo intentionally uses a lean CMake-based VS Code workflow instead of Cube
 
 ### Target Hardware
 
-- Current bring-up base: **NUCLEO-N657X0-Q** with **STM32N657X0H3Q**
+- Current bring-up base: **NUCLEO-N657X0-Q** with **[STM32N657X0H3Q](https://www.st.com/en/microcontrollers-microprocessors/stm32n657x0.html)**.
 - Future target: your final Cerebellum hardware can be ported from this base once the custom pinout and peripherals are known.
 
 ### First-Time Project Setup

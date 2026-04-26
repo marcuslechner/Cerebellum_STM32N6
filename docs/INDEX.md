@@ -13,6 +13,7 @@ Search [st.com](https://www.st.com) by the document number (e.g. `RM0486`) to fi
 
 ## Core MCU
 
+- **DS14791 (STM32N657X0H3Q.pdf)** — STM32N6x5xx/STM32N6x7xx datasheet. Main product specification: features, electrical characteristics, package data. Pin descriptions start on page 88.
 - **RM0486** — STM32N647/657xx Arm-based 32-bit MCUs reference manual. Primary register / peripheral reference.
 - **PM0273** — STM32 Cortex-M55 MCUs programming manual. Core, MVE/Helium, debug.
 
