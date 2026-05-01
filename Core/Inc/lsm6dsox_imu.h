@@ -10,6 +10,21 @@ extern "C" {
 
 #define LSM6DSOX_WHO_AM_I_VALUE 0x6CU
 
+typedef enum
+{
+  LSM6DSOX_INIT_OK = 0,
+  LSM6DSOX_INIT_ERR_NULL_HANDLE,
+  LSM6DSOX_INIT_ERR_WHOAMI_READ,
+  LSM6DSOX_INIT_ERR_WHOAMI_MISMATCH,
+  LSM6DSOX_INIT_ERR_RESET_WRITE,
+  LSM6DSOX_INIT_ERR_RESET_POLL_READ,
+  LSM6DSOX_INIT_ERR_RESET_TIMEOUT,
+  LSM6DSOX_INIT_ERR_CTRL3_WRITE,
+  LSM6DSOX_INIT_ERR_CTRL1_WRITE,
+  LSM6DSOX_INIT_ERR_CTRL2_WRITE,
+  LSM6DSOX_INIT_ERR_INT1_WRITE
+} LSM6DSOX_InitError;
+
 typedef struct
 {
   int16_t gyro_x;
@@ -22,7 +37,11 @@ typedef struct
 
 HAL_StatusTypeDef LSM6DSOX_Init(SPI_HandleTypeDef *spi_handle);
 HAL_StatusTypeDef LSM6DSOX_ReadWhoAmI(uint8_t *who_am_i);
+HAL_StatusTypeDef LSM6DSOX_ProbeWhoAmI(SPI_HandleTypeDef *spi_handle, uint8_t *who_am_i);
 HAL_StatusTypeDef LSM6DSOX_ReadRawSample(LSM6DSOX_RawSample *sample);
+LSM6DSOX_InitError LSM6DSOX_GetLastInitError(void);
+HAL_StatusTypeDef LSM6DSOX_GetLastHalStatus(void);
+uint8_t LSM6DSOX_GetLastWhoAmI(void);
 
 void LSM6DSOX_OnDrdyInterrupt(void);
 uint32_t LSM6DSOX_TakeDrdyCount(void);

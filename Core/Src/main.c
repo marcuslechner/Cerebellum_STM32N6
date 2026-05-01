@@ -35,7 +35,9 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define APP_IMU_ENABLE 0
+#define APP_IMU_ENABLE 1U
+#define APP_IMU_USE_DRDY_IRQ 1U
+#define APP_IMU_POLL_PERIOD_MS 10U
 
 /* USER CODE END PD */
 
@@ -45,6 +47,8 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+UART_HandleTypeDef hlpuart1;
+
 #if (APP_IMU_ENABLE == 1U)
 SPI_HandleTypeDef hspi5;
 #endif
@@ -54,6 +58,7 @@ SPI_HandleTypeDef hspi5;
 static LSM6DSOX_RawSample s_last_imu_sample = {0};
 static uint8_t s_has_sample = 0U;
 static uint32_t s_samples_in_window = 0U;
+static uint32_t s_last_imu_poll_ms = 0U;
 #endif
 static uint32_t s_last_report_ms = 0U;
 
@@ -62,8 +67,12 @@ static uint32_t s_last_report_ms = 0U;
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_LPUART1_UART_Init(void);
 #if (APP_IMU_ENABLE == 1U)
 static void MX_SPI5_Init(void);
+#endif
+#if (APP_IMU_ENABLE == 1U) && (APP_IMU_USE_DRDY_IRQ == 1U)
+static void APP_IMU_EnableDrdyIrq(void);
 #endif
 /* USER CODE BEGIN PFP */
 
@@ -73,6 +82,14 @@ static void MX_SPI5_Init(void);
 /* USER CODE BEGIN 0 */
 int __io_putchar(int ch)
 {
+  uint8_t byte = (uint8_t)ch;
+
+  if ((hlpuart1.Instance == LPUART1) && (hlpuart1.gState != HAL_UART_STATE_RESET))
+  {
+    (void)HAL_UART_Transmit(&hlpuart1, &byte, 1U, HAL_MAX_DELAY);
+    return ch;
+  }
+
   return (int)ITM_SendChar((uint32_t)ch);
 }
 
@@ -121,16 +138,28 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_LPUART1_UART_Init();
 #if (APP_IMU_ENABLE == 1U)
   MX_SPI5_Init();
 #endif
   /* USER CODE BEGIN 2 */
+  setvbuf(stdout, NULL, _IONBF, 0);
+
 #if (APP_IMU_ENABLE == 1U)
   uint8_t who_am_i = 0U;
 
-  if (LSM6DSOX_Init(&hspi5) != HAL_OK)
+  HAL_StatusTypeDef imu_init_status = LSM6DSOX_Init(&hspi5);
+  if (imu_init_status != HAL_OK)
   {
-    printf("LSM6DSOX init failed.\r\n");
+    uint8_t probe_who_am_i = 0U;
+    HAL_StatusTypeDef probe_status = LSM6DSOX_ProbeWhoAmI(&hspi5, &probe_who_am_i);
+    printf("LSM6DSOX init failed: init=%d step=%d last_hal=%d who=0x%02X probe=%d probe_who=0x%02X\r\n",
+           (int)imu_init_status,
+           (int)LSM6DSOX_GetLastInitError(),
+           (int)LSM6DSOX_GetLastHalStatus(),
+           LSM6DSOX_GetLastWhoAmI(),
+           (int)probe_status,
+           probe_who_am_i);
     Error_Handler();
   }
 
@@ -140,6 +169,11 @@ int main(void)
     Error_Handler();
   }
 
+#if (APP_IMU_USE_DRDY_IRQ == 1U)
+  APP_IMU_EnableDrdyIrq();
+#endif
+
+#if (APP_IMU_USE_DRDY_IRQ == 1U)
   uint32_t drdy_wait_start_ms = HAL_GetTick();
   uint32_t startup_drdy_count = 0U;
   while ((HAL_GetTick() - drdy_wait_start_ms) < 250U)
@@ -156,6 +190,7 @@ int main(void)
     printf("LSM6DSOX DRDY timeout during startup.\r\n");
     Error_Handler();
   }
+#endif
 
   if (LSM6DSOX_ReadRawSample(&s_last_imu_sample) != HAL_OK)
   {
@@ -163,6 +198,7 @@ int main(void)
     Error_Handler();
   }
   s_has_sample = 1U;
+  s_last_imu_poll_ms = HAL_GetTick();
 
   printf("LSM6DSOX bring-up ok. WHO_AM_I=0x%02X\r\n", who_am_i);
 #else
@@ -181,6 +217,7 @@ int main(void)
     /* USER CODE BEGIN 3 */
     uint32_t now = HAL_GetTick();
 #if (APP_IMU_ENABLE == 1U)
+#if (APP_IMU_USE_DRDY_IRQ == 1U)
     uint32_t pending_drdy = LSM6DSOX_TakeDrdyCount();
 
     while (pending_drdy > 0U)
@@ -194,6 +231,19 @@ int main(void)
       s_samples_in_window++;
       pending_drdy--;
     }
+#else
+    if ((now - s_last_imu_poll_ms) >= APP_IMU_POLL_PERIOD_MS)
+    {
+      s_last_imu_poll_ms = now;
+      if (LSM6DSOX_ReadRawSample(&s_last_imu_sample) != HAL_OK)
+      {
+        printf("LSM6DSOX sample read failed.\r\n");
+        Error_Handler();
+      }
+      s_has_sample = 1U;
+      s_samples_in_window++;
+    }
+#endif
 
     if ((now - s_last_report_ms) >= 1000U)
     {
@@ -202,14 +252,14 @@ int main(void)
 
       if (s_has_sample != 0U)
       {
-        printf("drdy/s=%lu g=[%d,%d,%d] a=[%d,%d,%d]\r\n",
+        printf("samples/s=%lu g=[%d,%d,%d] a=[%d,%d,%d]\r\n",
                (unsigned long)s_samples_in_window,
                s_last_imu_sample.gyro_x, s_last_imu_sample.gyro_y, s_last_imu_sample.gyro_z,
                s_last_imu_sample.accel_x, s_last_imu_sample.accel_y, s_last_imu_sample.accel_z);
       }
       else
       {
-        printf("drdy/s=%lu (waiting for first sample)\r\n", (unsigned long)s_samples_in_window);
+        printf("samples/s=%lu (waiting for first sample)\r\n", (unsigned long)s_samples_in_window);
       }
       s_samples_in_window = 0U;
     }
@@ -290,6 +340,10 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL4.PLLState = RCC_PLL_NONE;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
+
+
+
+
     Error_Handler();
   }
 
@@ -358,6 +412,46 @@ void SystemClock_Config(void)
 }
 
 /**
+  * @brief LPUART1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_LPUART1_UART_Init(void)
+{
+  hlpuart1.Instance = LPUART1;
+  hlpuart1.Init.BaudRate = 115200;
+  hlpuart1.Init.WordLength = UART_WORDLENGTH_8B;
+  hlpuart1.Init.StopBits = UART_STOPBITS_1;
+  hlpuart1.Init.Parity = UART_PARITY_NONE;
+  hlpuart1.Init.Mode = UART_MODE_TX_RX;
+  hlpuart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  hlpuart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  hlpuart1.Init.ClockPrescaler = UART_PRESCALER_DIV1;
+  hlpuart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  hlpuart1.FifoMode = UART_FIFOMODE_DISABLE;
+
+  if (HAL_UART_Init(&hlpuart1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  if (HAL_UARTEx_SetTxFifoThreshold(&hlpuart1, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  if (HAL_UARTEx_SetRxFifoThreshold(&hlpuart1, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  if (HAL_UARTEx_DisableFifoMode(&hlpuart1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+}
+
+/**
   * @brief SPI5 Initialization Function
   * @param None
   * @retval None
@@ -369,8 +463,8 @@ static void MX_SPI5_Init(void)
   hspi5.Init.Mode = SPI_MODE_MASTER;
   hspi5.Init.Direction = SPI_DIRECTION_2LINES;
   hspi5.Init.DataSize = SPI_DATASIZE_8BIT;
-  hspi5.Init.CLKPolarity = SPI_POLARITY_HIGH;
-  hspi5.Init.CLKPhase = SPI_PHASE_2EDGE;
+  hspi5.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi5.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi5.Init.NSS = SPI_NSS_SOFT;
   hspi5.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32;
   hspi5.Init.FirstBit = SPI_FIRSTBIT_MSB;
@@ -433,7 +527,11 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin : IMU_INT_Pin */
   GPIO_InitStruct.Pin = IMU_INT_Pin;
+#if (APP_IMU_USE_DRDY_IRQ == 1U)
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+#else
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+#endif
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(IMU_INT_GPIO_Port, &GPIO_InitStruct);
 #endif
@@ -451,11 +549,6 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
   HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
 
-#if (APP_IMU_ENABLE == 1U)
-  HAL_NVIC_SetPriority(EXTI12_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(EXTI12_IRQn);
-#endif
-
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
 }
@@ -463,7 +556,7 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
-#if (APP_IMU_ENABLE == 1U)
+#if (APP_IMU_ENABLE == 1U) && (APP_IMU_USE_DRDY_IRQ == 1U)
   if (GPIO_Pin == IMU_INT_Pin)
   {
     LSM6DSOX_OnDrdyInterrupt();
@@ -472,6 +565,17 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
   (void)GPIO_Pin;
 #endif
 }
+
+#if (APP_IMU_ENABLE == 1U) && (APP_IMU_USE_DRDY_IRQ == 1U)
+static void APP_IMU_EnableDrdyIrq(void)
+{
+  /* Clear any stale EXTI/NVIC pending state before arming the line. */
+  __HAL_GPIO_EXTI_CLEAR_IT(IMU_INT_Pin);
+  HAL_NVIC_ClearPendingIRQ(EXTI12_IRQn);
+  HAL_NVIC_SetPriority(EXTI12_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI12_IRQn);
+}
+#endif
 /* USER CODE END 4 */
 
 /**

@@ -26,6 +26,9 @@
 
 static SPI_HandleTypeDef *s_spi = NULL;
 static volatile uint32_t s_drdy_count = 0U;
+static LSM6DSOX_InitError s_last_init_error = LSM6DSOX_INIT_OK;
+static HAL_StatusTypeDef s_last_hal_status = HAL_OK;
+static uint8_t s_last_who_am_i = 0U;
 
 static HAL_StatusTypeDef lsm6dsox_write(uint8_t reg, const uint8_t *data, uint16_t len);
 static HAL_StatusTypeDef lsm6dsox_read(uint8_t reg, uint8_t *data, uint16_t len);
@@ -41,8 +44,14 @@ HAL_StatusTypeDef LSM6DSOX_Init(SPI_HandleTypeDef *spi_handle)
   uint8_t ctrl3_c = 0U;
   uint32_t start_tick = 0U;
 
+  s_last_init_error = LSM6DSOX_INIT_OK;
+  s_last_hal_status = HAL_OK;
+  s_last_who_am_i = 0U;
+
   if (spi_handle == NULL)
   {
+    s_last_init_error = LSM6DSOX_INIT_ERR_NULL_HANDLE;
+    s_last_hal_status = HAL_ERROR;
     return HAL_ERROR;
   }
 
@@ -50,26 +59,35 @@ HAL_StatusTypeDef LSM6DSOX_Init(SPI_HandleTypeDef *spi_handle)
   lsm6dsox_cs_deselect();
   HAL_Delay(LSM6DSOX_BOOT_DELAY_MS);
 
-  if (LSM6DSOX_ReadWhoAmI(&who_am_i) != HAL_OK)
+  s_last_hal_status = LSM6DSOX_ReadWhoAmI(&who_am_i);
+  s_last_who_am_i = who_am_i;
+  if (s_last_hal_status != HAL_OK)
   {
+    s_last_init_error = LSM6DSOX_INIT_ERR_WHOAMI_READ;
     return HAL_ERROR;
   }
 
   if (who_am_i != LSM6DSOX_WHO_AM_I_VALUE)
   {
+    s_last_init_error = LSM6DSOX_INIT_ERR_WHOAMI_MISMATCH;
+    s_last_hal_status = HAL_ERROR;
     return HAL_ERROR;
   }
 
-  if (lsm6dsox_write_reg(LSM6DSOX_REG_CTRL3_C, LSM6DSOX_CTRL3_C_SW_RESET) != HAL_OK)
+  s_last_hal_status = lsm6dsox_write_reg(LSM6DSOX_REG_CTRL3_C, LSM6DSOX_CTRL3_C_SW_RESET);
+  if (s_last_hal_status != HAL_OK)
   {
+    s_last_init_error = LSM6DSOX_INIT_ERR_RESET_WRITE;
     return HAL_ERROR;
   }
 
   start_tick = HAL_GetTick();
   do
   {
-    if (lsm6dsox_read_reg(LSM6DSOX_REG_CTRL3_C, &ctrl3_c) != HAL_OK)
+    s_last_hal_status = lsm6dsox_read_reg(LSM6DSOX_REG_CTRL3_C, &ctrl3_c);
+    if (s_last_hal_status != HAL_OK)
     {
+      s_last_init_error = LSM6DSOX_INIT_ERR_RESET_POLL_READ;
       return HAL_ERROR;
     }
     if ((ctrl3_c & LSM6DSOX_CTRL3_C_SW_RESET) == 0U)
@@ -80,37 +98,41 @@ HAL_StatusTypeDef LSM6DSOX_Init(SPI_HandleTypeDef *spi_handle)
 
   if ((ctrl3_c & LSM6DSOX_CTRL3_C_SW_RESET) != 0U)
   {
+    s_last_init_error = LSM6DSOX_INIT_ERR_RESET_TIMEOUT;
+    s_last_hal_status = HAL_TIMEOUT;
     return HAL_TIMEOUT;
   }
 
-  if (lsm6dsox_write_reg(LSM6DSOX_REG_CTRL3_C, LSM6DSOX_CTRL3_C_BDU | LSM6DSOX_CTRL3_C_IF_INC) != HAL_OK)
+  s_last_hal_status = lsm6dsox_write_reg(LSM6DSOX_REG_CTRL3_C, LSM6DSOX_CTRL3_C_BDU | LSM6DSOX_CTRL3_C_IF_INC);
+  if (s_last_hal_status != HAL_OK)
   {
+    s_last_init_error = LSM6DSOX_INIT_ERR_CTRL3_WRITE;
     return HAL_ERROR;
   }
 
-  if (lsm6dsox_write_reg(LSM6DSOX_REG_CTRL1_XL, LSM6DSOX_CTRL1_XL_833HZ_4G) != HAL_OK)
+  s_last_hal_status = lsm6dsox_write_reg(LSM6DSOX_REG_CTRL1_XL, LSM6DSOX_CTRL1_XL_833HZ_4G);
+  if (s_last_hal_status != HAL_OK)
   {
+    s_last_init_error = LSM6DSOX_INIT_ERR_CTRL1_WRITE;
     return HAL_ERROR;
   }
 
-  if (lsm6dsox_write_reg(LSM6DSOX_REG_CTRL2_G, LSM6DSOX_CTRL2_G_833HZ_2000DPS) != HAL_OK)
+  s_last_hal_status = lsm6dsox_write_reg(LSM6DSOX_REG_CTRL2_G, LSM6DSOX_CTRL2_G_833HZ_2000DPS);
+  if (s_last_hal_status != HAL_OK)
   {
+    s_last_init_error = LSM6DSOX_INIT_ERR_CTRL2_WRITE;
     return HAL_ERROR;
   }
 
   /* Route only accel data-ready to INT1 so DRDY frequency is deterministic. */
-  if (lsm6dsox_write_reg(LSM6DSOX_REG_INT1_CTRL, LSM6DSOX_INT1_DRDY_XL_ENABLE) != HAL_OK)
+  s_last_hal_status = lsm6dsox_write_reg(LSM6DSOX_REG_INT1_CTRL, LSM6DSOX_INT1_DRDY_XL_ENABLE);
+  if (s_last_hal_status != HAL_OK)
   {
+    s_last_init_error = LSM6DSOX_INIT_ERR_INT1_WRITE;
     return HAL_ERROR;
   }
 
-  uint32_t primask = __get_PRIMASK();
-  __disable_irq();
   s_drdy_count = 0U;
-  if (primask == 0U)
-  {
-    __enable_irq();
-  }
 
   return HAL_OK;
 }
@@ -123,6 +145,22 @@ HAL_StatusTypeDef LSM6DSOX_ReadWhoAmI(uint8_t *who_am_i)
   }
 
   return lsm6dsox_read_reg(LSM6DSOX_REG_WHO_AM_I, who_am_i);
+}
+
+HAL_StatusTypeDef LSM6DSOX_ProbeWhoAmI(SPI_HandleTypeDef *spi_handle, uint8_t *who_am_i)
+{
+  if ((spi_handle == NULL) || (who_am_i == NULL))
+  {
+    return HAL_ERROR;
+  }
+
+  s_spi = spi_handle;
+  lsm6dsox_cs_deselect();
+  HAL_Delay(LSM6DSOX_BOOT_DELAY_MS);
+
+  s_last_hal_status = lsm6dsox_read_reg(LSM6DSOX_REG_WHO_AM_I, who_am_i);
+  s_last_who_am_i = *who_am_i;
+  return s_last_hal_status;
 }
 
 HAL_StatusTypeDef LSM6DSOX_ReadRawSample(LSM6DSOX_RawSample *sample)
@@ -168,6 +206,21 @@ uint32_t LSM6DSOX_TakeDrdyCount(void)
   }
 
   return pending;
+}
+
+LSM6DSOX_InitError LSM6DSOX_GetLastInitError(void)
+{
+  return s_last_init_error;
+}
+
+HAL_StatusTypeDef LSM6DSOX_GetLastHalStatus(void)
+{
+  return s_last_hal_status;
+}
+
+uint8_t LSM6DSOX_GetLastWhoAmI(void)
+{
+  return s_last_who_am_i;
 }
 
 static HAL_StatusTypeDef lsm6dsox_write_reg(uint8_t reg, uint8_t value)
