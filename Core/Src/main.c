@@ -35,8 +35,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define APP_IMU_ENABLE 1U
-#define APP_IMU_USE_DRDY_IRQ 1U
+#define APP_IMU_ENABLE 0U
+#define APP_IMU_USE_DRDY_IRQ 0U
 #define APP_IMU_POLL_PERIOD_MS 10U
 
 /* USER CODE END PD */
@@ -47,7 +47,7 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-UART_HandleTypeDef hlpuart1;
+UART_HandleTypeDef huart1;
 
 #if (APP_IMU_ENABLE == 1U)
 SPI_HandleTypeDef hspi5;
@@ -67,7 +67,7 @@ static uint32_t s_last_report_ms = 0U;
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_LPUART1_UART_Init(void);
+static void MX_USART1_UART_Init(void);
 #if (APP_IMU_ENABLE == 1U)
 static void MX_SPI5_Init(void);
 #endif
@@ -84,9 +84,9 @@ int __io_putchar(int ch)
 {
   uint8_t byte = (uint8_t)ch;
 
-  if ((hlpuart1.Instance == LPUART1) && (hlpuart1.gState != HAL_UART_STATE_RESET))
+  if ((huart1.Instance == USART1) && (huart1.gState != HAL_UART_STATE_RESET))
   {
-    (void)HAL_UART_Transmit(&hlpuart1, &byte, 1U, HAL_MAX_DELAY);
+    (void)HAL_UART_Transmit(&huart1, &byte, 1U, HAL_MAX_DELAY);
     return ch;
   }
 
@@ -138,12 +138,13 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_LPUART1_UART_Init();
+  MX_USART1_UART_Init();
 #if (APP_IMU_ENABLE == 1U)
   MX_SPI5_Init();
 #endif
   /* USER CODE BEGIN 2 */
   setvbuf(stdout, NULL, _IONBF, 0);
+  printf("UART debug ready.\r\n");
 
 #if (APP_IMU_ENABLE == 1U)
   uint8_t who_am_i = 0U;
@@ -412,40 +413,41 @@ void SystemClock_Config(void)
 }
 
 /**
-  * @brief LPUART1 Initialization Function
+  * @brief USART1 Initialization Function
   * @param None
   * @retval None
   */
-static void MX_LPUART1_UART_Init(void)
+static void MX_USART1_UART_Init(void)
 {
-  hlpuart1.Instance = LPUART1;
-  hlpuart1.Init.BaudRate = 115200;
-  hlpuart1.Init.WordLength = UART_WORDLENGTH_8B;
-  hlpuart1.Init.StopBits = UART_STOPBITS_1;
-  hlpuart1.Init.Parity = UART_PARITY_NONE;
-  hlpuart1.Init.Mode = UART_MODE_TX_RX;
-  hlpuart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  hlpuart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
-  hlpuart1.Init.ClockPrescaler = UART_PRESCALER_DIV1;
-  hlpuart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
-  hlpuart1.FifoMode = UART_FIFOMODE_DISABLE;
+  huart1.Instance = USART1;
+  huart1.Init.BaudRate = 115200;
+  huart1.Init.WordLength = UART_WORDLENGTH_8B;
+  huart1.Init.StopBits = UART_STOPBITS_1;
+  huart1.Init.Parity = UART_PARITY_NONE;
+  huart1.Init.Mode = UART_MODE_TX_RX;
+  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart1.Init.OverSampling = UART_OVERSAMPLING_8;
+  huart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart1.Init.ClockPrescaler = UART_PRESCALER_DIV1;
+  huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  huart1.FifoMode = UART_FIFOMODE_DISABLE;
 
-  if (HAL_UART_Init(&hlpuart1) != HAL_OK)
+  if (HAL_UART_Init(&huart1) != HAL_OK)
   {
     Error_Handler();
   }
 
-  if (HAL_UARTEx_SetTxFifoThreshold(&hlpuart1, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
+  if (HAL_UARTEx_SetTxFifoThreshold(&huart1, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
   {
     Error_Handler();
   }
 
-  if (HAL_UARTEx_SetRxFifoThreshold(&hlpuart1, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
+  if (HAL_UARTEx_SetRxFifoThreshold(&huart1, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
   {
     Error_Handler();
   }
 
-  if (HAL_UARTEx_DisableFifoMode(&hlpuart1) != HAL_OK)
+  if (HAL_UARTEx_DisableFifoMode(&huart1) != HAL_OK)
   {
     Error_Handler();
   }

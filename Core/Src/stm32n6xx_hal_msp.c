@@ -81,40 +81,38 @@ void HAL_UART_MspInit(UART_HandleTypeDef *huart)
   GPIO_InitTypeDef GPIO_InitStruct = {0};
   RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
 
-  if (huart->Instance == LPUART1)
+  if (huart->Instance == USART1)
   {
-    PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_LPUART1;
-    PeriphClkInitStruct.Lpuart1ClockSelection = RCC_LPUART1CLKSOURCE_PCLK4;
+    PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_USART1;
+    PeriphClkInitStruct.Usart1ClockSelection = RCC_USART1CLKSOURCE_PCLK2;
     if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
     {
       Error_Handler();
     }
 
-    __HAL_RCC_LPUART1_CLK_ENABLE();
+    __HAL_RCC_USART1_CLK_ENABLE();
     __HAL_RCC_GPIOE_CLK_ENABLE();
-    __HAL_RCC_GPIOA_CLK_ENABLE();
 
-    /* CubeMX-generated VCP path: LPUART1_RX on PE6 and LPUART1_TX on PA9. */
-    GPIO_InitStruct.Pin = GPIO_PIN_6;
+    /* NUCLEO-N657X0-Q ST-LINK VCP path: USART1 TX on PE5, RX on PE6. */
+    GPIO_InitStruct.Pin = GPIO_PIN_5;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-    GPIO_InitStruct.Alternate = GPIO_AF3_LPUART1;
+    GPIO_InitStruct.Pull = GPIO_PULLUP;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+    GPIO_InitStruct.Alternate = GPIO_AF7_USART1;
     HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
-    GPIO_InitStruct.Pin = GPIO_PIN_9;
-    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+    GPIO_InitStruct.Pin = GPIO_PIN_6;
+    HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
   }
 }
 
 void HAL_UART_MspDeInit(UART_HandleTypeDef *huart)
 {
-  if (huart->Instance == LPUART1)
+  if (huart->Instance == USART1)
   {
-    __HAL_RCC_LPUART1_CLK_DISABLE();
+    __HAL_RCC_USART1_CLK_DISABLE();
 
-    HAL_GPIO_DeInit(GPIOE, GPIO_PIN_6);
-    HAL_GPIO_DeInit(GPIOA, GPIO_PIN_9);
+    HAL_GPIO_DeInit(GPIOE, GPIO_PIN_5 | GPIO_PIN_6);
   }
 }
 
