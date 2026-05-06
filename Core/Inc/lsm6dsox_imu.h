@@ -10,6 +10,18 @@ extern "C" {
 
 #define LSM6DSOX_WHO_AM_I_VALUE 0x6CU
 
+#ifndef LSM6DSOX_APP_ENABLE
+#define LSM6DSOX_APP_ENABLE 1U
+#endif
+
+#ifndef LSM6DSOX_APP_USE_DRDY_IRQ
+#define LSM6DSOX_APP_USE_DRDY_IRQ 0U
+#endif
+
+#ifndef LSM6DSOX_APP_POLL_PERIOD_MS
+#define LSM6DSOX_APP_POLL_PERIOD_MS 10U
+#endif
+
 typedef enum
 {
   LSM6DSOX_INIT_OK = 0,
@@ -36,6 +48,9 @@ typedef struct
 } LSM6DSOX_RawSample;
 
 HAL_StatusTypeDef LSM6DSOX_Init(SPI_HandleTypeDef *spi_handle);
+HAL_StatusTypeDef LSM6DSOX_AppInit(SPI_HandleTypeDef *spi_handle);
+HAL_StatusTypeDef LSM6DSOX_AppProcess(void);
+void LSM6DSOX_AppHandleGpioExti(uint16_t GPIO_Pin);
 HAL_StatusTypeDef LSM6DSOX_ReadWhoAmI(uint8_t *who_am_i);
 HAL_StatusTypeDef LSM6DSOX_ProbeWhoAmI(SPI_HandleTypeDef *spi_handle, uint8_t *who_am_i);
 HAL_StatusTypeDef LSM6DSOX_ReadRawSample(LSM6DSOX_RawSample *sample);

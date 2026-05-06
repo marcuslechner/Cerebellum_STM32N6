@@ -2,6 +2,7 @@
 
 #include "main.h"
 
+#include <stdio.h>
 #include <string.h>
 
 #define LSM6DSOX_SPI_TIMEOUT_MS            100U
@@ -30,6 +31,14 @@ static LSM6DSOX_InitError s_last_init_error = LSM6DSOX_INIT_OK;
 static HAL_StatusTypeDef s_last_hal_status = HAL_OK;
 static uint8_t s_last_who_am_i = 0U;
 
+#if (LSM6DSOX_APP_ENABLE == 1U)
+static LSM6DSOX_RawSample s_last_sample = {0};
+static uint8_t s_has_sample = 0U;
+static uint32_t s_samples_in_window = 0U;
+static uint32_t s_last_poll_ms = 0U;
+#endif
+static uint32_t s_last_report_ms = 0U;
+
 static HAL_StatusTypeDef lsm6dsox_write(uint8_t reg, const uint8_t *data, uint16_t len);
 static HAL_StatusTypeDef lsm6dsox_read(uint8_t reg, uint8_t *data, uint16_t len);
 static HAL_StatusTypeDef lsm6dsox_write_reg(uint8_t reg, uint8_t value);
@@ -37,6 +46,153 @@ static HAL_StatusTypeDef lsm6dsox_read_reg(uint8_t reg, uint8_t *value);
 
 static void lsm6dsox_cs_select(void);
 static void lsm6dsox_cs_deselect(void);
+#if (LSM6DSOX_APP_ENABLE == 1U) && (LSM6DSOX_APP_USE_DRDY_IRQ == 1U)
+static void lsm6dsox_app_enable_drdy_irq(void);
+#endif
+
+HAL_StatusTypeDef LSM6DSOX_AppInit(SPI_HandleTypeDef *spi_handle)
+{
+#if (LSM6DSOX_APP_ENABLE == 1U)
+  uint8_t who_am_i = 0U;
+  HAL_StatusTypeDef init_status = LSM6DSOX_Init(spi_handle);
+
+  if (init_status != HAL_OK)
+  {
+    uint8_t probe_who_am_i = 0U;
+    HAL_StatusTypeDef probe_status = LSM6DSOX_ProbeWhoAmI(spi_handle, &probe_who_am_i);
+
+    printf("LSM6DSOX init failed: init=%d step=%d last_hal=%d who=0x%02X probe=%d probe_who=0x%02X\r\n",
+           (int)init_status,
+           (int)LSM6DSOX_GetLastInitError(),
+           (int)LSM6DSOX_GetLastHalStatus(),
+           LSM6DSOX_GetLastWhoAmI(),
+           (int)probe_status,
+           probe_who_am_i);
+    return init_status;
+  }
+
+  if ((LSM6DSOX_ReadWhoAmI(&who_am_i) != HAL_OK) || (who_am_i != LSM6DSOX_WHO_AM_I_VALUE))
+  {
+    printf("LSM6DSOX WHO_AM_I mismatch: 0x%02X\r\n", who_am_i);
+    return HAL_ERROR;
+  }
+
+#if (LSM6DSOX_APP_USE_DRDY_IRQ == 1U)
+  lsm6dsox_app_enable_drdy_irq();
+
+  uint32_t drdy_wait_start_ms = HAL_GetTick();
+  uint32_t startup_drdy_count = 0U;
+  while ((HAL_GetTick() - drdy_wait_start_ms) < 250U)
+  {
+    startup_drdy_count += LSM6DSOX_TakeDrdyCount();
+    if (startup_drdy_count > 0U)
+    {
+      break;
+    }
+  }
+
+  if (startup_drdy_count == 0U)
+  {
+    printf("LSM6DSOX DRDY timeout during startup.\r\n");
+    return HAL_TIMEOUT;
+  }
+#endif
+
+  if (LSM6DSOX_ReadRawSample(&s_last_sample) != HAL_OK)
+  {
+    printf("LSM6DSOX first sample read failed.\r\n");
+    return HAL_ERROR;
+  }
+
+  s_has_sample = 1U;
+  s_samples_in_window = 0U;
+  s_last_poll_ms = HAL_GetTick();
+  s_last_report_ms = s_last_poll_ms;
+
+  printf("LSM6DSOX bring-up ok. WHO_AM_I=0x%02X\r\n", who_am_i);
+  return HAL_OK;
+#else
+  (void)spi_handle;
+  s_last_report_ms = HAL_GetTick();
+  printf("IMU functionality disabled (LSM6DSOX_APP_ENABLE=0).\r\n");
+  return HAL_OK;
+#endif
+}
+
+HAL_StatusTypeDef LSM6DSOX_AppProcess(void)
+{
+  uint32_t now = HAL_GetTick();
+
+#if (LSM6DSOX_APP_ENABLE == 1U)
+#if (LSM6DSOX_APP_USE_DRDY_IRQ == 1U)
+  uint32_t pending_drdy = LSM6DSOX_TakeDrdyCount();
+
+  while (pending_drdy > 0U)
+  {
+    if (LSM6DSOX_ReadRawSample(&s_last_sample) != HAL_OK)
+    {
+      printf("LSM6DSOX sample read failed.\r\n");
+      return HAL_ERROR;
+    }
+    s_has_sample = 1U;
+    s_samples_in_window++;
+    pending_drdy--;
+  }
+#else
+  if ((now - s_last_poll_ms) >= LSM6DSOX_APP_POLL_PERIOD_MS)
+  {
+    s_last_poll_ms = now;
+    if (LSM6DSOX_ReadRawSample(&s_last_sample) != HAL_OK)
+    {
+      printf("LSM6DSOX sample read failed.\r\n");
+      return HAL_ERROR;
+    }
+    s_has_sample = 1U;
+    s_samples_in_window++;
+  }
+#endif
+
+  if ((now - s_last_report_ms) >= 1000U)
+  {
+    s_last_report_ms = now;
+    HAL_GPIO_TogglePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin);
+
+    if (s_has_sample != 0U)
+    {
+      printf("samples/s=%lu g=[%d,%d,%d] a=[%d,%d,%d]\r\n",
+             (unsigned long)s_samples_in_window,
+             s_last_sample.gyro_x, s_last_sample.gyro_y, s_last_sample.gyro_z,
+             s_last_sample.accel_x, s_last_sample.accel_y, s_last_sample.accel_z);
+    }
+    else
+    {
+      printf("samples/s=%lu (waiting for first sample)\r\n", (unsigned long)s_samples_in_window);
+    }
+    s_samples_in_window = 0U;
+  }
+#else
+  if ((now - s_last_report_ms) >= 1000U)
+  {
+    s_last_report_ms = now;
+    HAL_GPIO_TogglePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin);
+    printf("IMU disabled.\r\n");
+  }
+#endif
+
+  return HAL_OK;
+}
+
+void LSM6DSOX_AppHandleGpioExti(uint16_t GPIO_Pin)
+{
+#if (LSM6DSOX_APP_ENABLE == 1U) && (LSM6DSOX_APP_USE_DRDY_IRQ == 1U)
+  if (GPIO_Pin == IMU_INT_Pin)
+  {
+    LSM6DSOX_OnDrdyInterrupt();
+  }
+#else
+  (void)GPIO_Pin;
+#endif
+}
 
 HAL_StatusTypeDef LSM6DSOX_Init(SPI_HandleTypeDef *spi_handle)
 {
@@ -290,3 +446,14 @@ static void lsm6dsox_cs_deselect(void)
 {
   HAL_GPIO_WritePin(IMU_CS_GPIO_Port, IMU_CS_Pin, GPIO_PIN_SET);
 }
+
+#if (LSM6DSOX_APP_ENABLE == 1U) && (LSM6DSOX_APP_USE_DRDY_IRQ == 1U)
+static void lsm6dsox_app_enable_drdy_irq(void)
+{
+  /* Clear any stale EXTI/NVIC pending state before arming the line. */
+  __HAL_GPIO_EXTI_CLEAR_IT(IMU_INT_Pin);
+  HAL_NVIC_ClearPendingIRQ(EXTI12_IRQn);
+  HAL_NVIC_SetPriority(EXTI12_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI12_IRQn);
+}
+#endif
