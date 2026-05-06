@@ -46,9 +46,7 @@
 /* Private variables ---------------------------------------------------------*/
 UART_HandleTypeDef huart1;
 
-#if (LSM6DSOX_APP_ENABLE == 1U)
 SPI_HandleTypeDef hspi5;
-#endif
 
 /* USER CODE BEGIN PV */
 
@@ -58,9 +56,7 @@ SPI_HandleTypeDef hspi5;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART1_UART_Init(void);
-#if (LSM6DSOX_APP_ENABLE == 1U)
 static void MX_SPI5_Init(void);
-#endif
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -126,24 +122,15 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART1_UART_Init();
-#if (LSM6DSOX_APP_ENABLE == 1U)
   MX_SPI5_Init();
-#endif
   /* USER CODE BEGIN 2 */
   setvbuf(stdout, NULL, _IONBF, 0);
   printf("UART debug ready.\r\n");
 
-#if (LSM6DSOX_APP_ENABLE == 1U)
   if (LSM6DSOX_AppInit(&hspi5) != HAL_OK)
   {
     Error_Handler();
   }
-#else
-  if (LSM6DSOX_AppInit(NULL) != HAL_OK)
-  {
-    Error_Handler();
-  }
-#endif
 
   /* USER CODE END 2 */
 
@@ -344,7 +331,6 @@ static void MX_USART1_UART_Init(void)
   * @param None
   * @retval None
   */
-#if (LSM6DSOX_APP_ENABLE == 1U)
 static void MX_SPI5_Init(void)
 {
   hspi5.Instance = SPI5;
@@ -378,7 +364,6 @@ static void MX_SPI5_Init(void)
     Error_Handler();
   }
 }
-#endif
 
 /**
   * @brief GPIO Initialization Function
@@ -398,14 +383,11 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOG_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-#if (LSM6DSOX_APP_ENABLE == 1U)
   HAL_GPIO_WritePin(IMU_CS_GPIO_Port, IMU_CS_Pin, GPIO_PIN_SET);
-#endif
   HAL_GPIO_WritePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin, GPIO_PIN_RESET);
   HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
   HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
 
-#if (LSM6DSOX_APP_ENABLE == 1U)
   /*Configure GPIO pin : IMU_CS_Pin */
   GPIO_InitStruct.Pin = IMU_CS_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
@@ -415,14 +397,9 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin : IMU_INT_Pin */
   GPIO_InitStruct.Pin = IMU_INT_Pin;
-#if (LSM6DSOX_APP_USE_DRDY_IRQ == 1U)
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-#else
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-#endif
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(IMU_INT_GPIO_Port, &GPIO_InitStruct);
-#endif
 
   /*Configure GPIO pin : BUTTON_USER_Pin */
   GPIO_InitStruct.Pin = BUTTON_USER_Pin;
