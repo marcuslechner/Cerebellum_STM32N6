@@ -5,25 +5,28 @@
 #include <stdio.h>
 #include <string.h>
 
-#define LSM6DSOX_SPI_TIMEOUT_MS            100U
-#define LSM6DSOX_SPI_MAX_TRANSFER_BYTES    32U
-#define LSM6DSOX_RESET_TIMEOUT_MS          100U
-#define LSM6DSOX_BOOT_DELAY_MS             10U
+#define LSM6DSOX_SPI_TIMEOUT_MS            100U  /* HAL SPI transaction timeout. */
+#define LSM6DSOX_SPI_MAX_TRANSFER_BYTES    32U   /* Largest burst this driver allows. */
+#define LSM6DSOX_RESET_TIMEOUT_MS          100U  /* Time allowed for CTRL3_C.SW_RESET to self-clear. */
+#define LSM6DSOX_BOOT_DELAY_MS             10U   /* Settling delay before first WHO_AM_I access. */
 
-#define LSM6DSOX_REG_INT1_CTRL             0x0DU
-#define LSM6DSOX_REG_CTRL1_XL              0x10U
-#define LSM6DSOX_REG_CTRL2_G               0x11U
-#define LSM6DSOX_REG_CTRL3_C               0x12U
-#define LSM6DSOX_REG_WHO_AM_I              0x0FU
-#define LSM6DSOX_REG_OUTX_L_G              0x22U
+#define LSM6DSOX_REG_INT1_CTRL             0x0DU /* INT1 route control register. */
+#define LSM6DSOX_REG_WHO_AM_I              0x0FU /* Fixed device ID register, expected 0x6C. */
+#define LSM6DSOX_REG_CTRL1_XL              0x10U /* Accelerometer ODR, full-scale, and filter register. */
+#define LSM6DSOX_REG_CTRL2_G               0x11U /* Gyroscope ODR and full-scale register. */
+#define LSM6DSOX_REG_CTRL3_C               0x12U /* Common control register: reset, BDU, auto-increment. */
+#define LSM6DSOX_REG_OUTX_L_G              0x22U /* First output byte for gyro XYZ then accel XYZ burst read. */
 
-#define LSM6DSOX_CTRL3_C_SW_RESET          0x01U
-#define LSM6DSOX_CTRL3_C_IF_INC            0x04U
-#define LSM6DSOX_CTRL3_C_BDU               0x40U
+#define LSM6DSOX_CTRL3_C_SW_RESET          0x01U /* CTRL3_C bit 0: software reset. */
+#define LSM6DSOX_CTRL3_C_IF_INC            0x04U /* CTRL3_C bit 2: auto-increment register address during bursts. */
+#define LSM6DSOX_CTRL3_C_BDU               0x40U /* CTRL3_C bit 6: block data update until high and low bytes are read. */
 
-#define LSM6DSOX_CTRL1_XL_833HZ_4G         0x78U
-#define LSM6DSOX_CTRL2_G_833HZ_2000DPS     0x7CU
-#define LSM6DSOX_INT1_DRDY_XL_ENABLE       0x01U
+#define LSM6DSOX_CTRL1_XL_833HZ_4G         0x78U /* CTRL1_XL: ODR_XL=833 Hz, FS_XL=+-4 g. */
+#define LSM6DSOX_CTRL2_G_833HZ_2000DPS     0x7CU /* CTRL2_G: ODR_G=833 Hz, FS_G=+-2000 dps. */
+#define LSM6DSOX_INT1_DRDY_XL_ENABLE       0x01U /* INT1_CTRL bit 0: route accelerometer data-ready to INT1. */
+
+#define LSM6DSOX_ACCEL_4G_UG_PER_LSB       122L  /* +-4 g accel sensitivity: 0.122 mg/LSB = 122 ug/LSB. */
+#define LSM6DSOX_GYRO_2000DPS_MDPS_PER_LSB 70L   /* +-2000 dps gyro sensitivity: 70 mdps/LSB. */
 
 static SPI_HandleTypeDef *s_spi = NULL;
 static volatile uint32_t s_drdy_count = 0U;
@@ -46,6 +49,9 @@ static void lsm6dsox_cs_deselect(void);
 static void lsm6dsox_app_enable_drdy_irq(void);
 static void lsm6dsox_on_drdy_interrupt(void);
 static uint32_t lsm6dsox_take_drdy_count(void);
+static int32_t lsm6dsox_accel_raw_to_milli_g(int16_t raw);
+static int32_t lsm6dsox_gyro_raw_to_milli_dps(int16_t raw);
+static void lsm6dsox_print_signed_milli(int32_t milli_value);
 
 HAL_StatusTypeDef LSM6DSOX_AppInit(SPI_HandleTypeDef *spi_handle)
 {
@@ -118,10 +124,19 @@ HAL_StatusTypeDef LSM6DSOX_AppProcess(void)
 
     if (s_has_sample != 0U)
     {
-      printf("samples/s=%lu g=[%d,%d,%d] a=[%d,%d,%d]\r\n",
-             (unsigned long)s_samples_in_window,
-             s_last_sample.gyro_x, s_last_sample.gyro_y, s_last_sample.gyro_z,
-             s_last_sample.accel_x, s_last_sample.accel_y, s_last_sample.accel_z);
+      printf("samples/s=%lu gyro_dps=[", (unsigned long)s_samples_in_window);
+      lsm6dsox_print_signed_milli(lsm6dsox_gyro_raw_to_milli_dps(s_last_sample.gyro_x));
+      printf(",");
+      lsm6dsox_print_signed_milli(lsm6dsox_gyro_raw_to_milli_dps(s_last_sample.gyro_y));
+      printf(",");
+      lsm6dsox_print_signed_milli(lsm6dsox_gyro_raw_to_milli_dps(s_last_sample.gyro_z));
+      printf("] accel_g=[");
+      lsm6dsox_print_signed_milli(lsm6dsox_accel_raw_to_milli_g(s_last_sample.accel_x));
+      printf(",");
+      lsm6dsox_print_signed_milli(lsm6dsox_accel_raw_to_milli_g(s_last_sample.accel_y));
+      printf(",");
+      lsm6dsox_print_signed_milli(lsm6dsox_accel_raw_to_milli_g(s_last_sample.accel_z));
+      printf("]\r\n");
     }
     else
     {
@@ -309,6 +324,42 @@ static uint32_t lsm6dsox_take_drdy_count(void)
   }
 
   return pending;
+}
+
+static int32_t lsm6dsox_accel_raw_to_milli_g(int16_t raw)
+{
+  int32_t micro_g = (int32_t)raw * LSM6DSOX_ACCEL_4G_UG_PER_LSB;
+
+  if (micro_g >= 0)
+  {
+    return (micro_g + 500L) / 1000L;
+  }
+
+  return (micro_g - 500L) / 1000L;
+}
+
+static int32_t lsm6dsox_gyro_raw_to_milli_dps(int16_t raw)
+{
+  return (int32_t)raw * LSM6DSOX_GYRO_2000DPS_MDPS_PER_LSB;
+}
+
+static void lsm6dsox_print_signed_milli(int32_t milli_value)
+{
+  uint32_t magnitude = 0U;
+
+  if (milli_value < 0)
+  {
+    printf("-");
+    magnitude = (uint32_t)(-milli_value);
+  }
+  else
+  {
+    magnitude = (uint32_t)milli_value;
+  }
+
+  printf("%lu.%03lu",
+         (unsigned long)(magnitude / 1000U),
+         (unsigned long)(magnitude % 1000U));
 }
 
 LSM6DSOX_InitError LSM6DSOX_GetLastInitError(void)
