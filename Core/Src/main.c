@@ -35,7 +35,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define APP_IMU_ENABLE 0U
+#define APP_IMU_ENABLE 1U
 #define APP_IMU_USE_DRDY_IRQ 0U
 #define APP_IMU_POLL_PERIOD_MS 10U
 
