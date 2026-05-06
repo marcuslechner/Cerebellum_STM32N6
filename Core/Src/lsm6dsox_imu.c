@@ -94,6 +94,11 @@ HAL_StatusTypeDef LSM6DSOX_AppProcess(void)
   uint32_t now = HAL_GetTick();
   uint32_t pending_drdy = lsm6dsox_take_drdy_count();
 
+  if ((pending_drdy == 0U) && (HAL_GPIO_ReadPin(IMU_INT_GPIO_Port, IMU_INT_Pin) == GPIO_PIN_SET))
+  {
+    pending_drdy = 1U;
+  }
+
   while (pending_drdy > 0U)
   {
     if (LSM6DSOX_ReadRawSample(&s_last_sample) != HAL_OK)
