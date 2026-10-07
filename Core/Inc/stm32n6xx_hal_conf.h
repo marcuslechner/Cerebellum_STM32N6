@@ -44,7 +44,7 @@ extern "C" {
 /*#define HAL_DTS_MODULE_ENABLED   */
 /*#define HAL_ETH_MODULE_ENABLED   */
 /*#define HAL_EXTI_MODULE_ENABLED   */
-/*#define HAL_FDCAN_MODULE_ENABLED   */
+#define HAL_FDCAN_MODULE_ENABLED
 /*#define HAL_GFXMMU_MODULE_ENABLED   */
 /*#define HAL_GFXTIM_MODULE_ENABLED   */
 /*#define HAL_HASH_MODULE_ENABLED   */

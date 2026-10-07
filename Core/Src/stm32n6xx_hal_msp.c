@@ -104,6 +104,26 @@ void HAL_UART_MspInit(UART_HandleTypeDef *huart)
     GPIO_InitStruct.Pin = GPIO_PIN_6;
     HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
   }
+  else if (huart->Instance == USART3)
+  {
+    PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_USART3;
+    PeriphClkInitStruct.Usart3ClockSelection = RCC_USART3CLKSOURCE_PCLK1;
+    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
+    {
+      Error_Handler();
+    }
+
+    __HAL_RCC_USART3_CLK_ENABLE();
+    __HAL_RCC_GPIOD_CLK_ENABLE();
+
+    /* ESP32 link: USART3 TX on PD8, RX on PD9 (AF7). */
+    GPIO_InitStruct.Pin = GPIO_PIN_8 | GPIO_PIN_9;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    GPIO_InitStruct.Alternate = GPIO_AF7_USART3;
+    HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+  }
 }
 
 void HAL_UART_MspDeInit(UART_HandleTypeDef *huart)
@@ -113,6 +133,49 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef *huart)
     __HAL_RCC_USART1_CLK_DISABLE();
 
     HAL_GPIO_DeInit(GPIOE, GPIO_PIN_5 | GPIO_PIN_6);
+  }
+  else if (huart->Instance == USART3)
+  {
+    __HAL_RCC_USART3_CLK_DISABLE();
+
+    HAL_GPIO_DeInit(GPIOD, GPIO_PIN_8 | GPIO_PIN_9);
+  }
+}
+
+void HAL_FDCAN_MspInit(FDCAN_HandleTypeDef *hfdcan)
+{
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
+  RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
+
+  if (hfdcan->Instance == FDCAN3)
+  {
+    PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_FDCAN;
+    PeriphClkInitStruct.FdcanClockSelection = RCC_FDCANCLKSOURCE_PCLK1;
+    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
+    {
+      Error_Handler();
+    }
+
+    __HAL_RCC_FDCAN_CLK_ENABLE();
+    __HAL_RCC_GPIOE_CLK_ENABLE();
+
+    /* FDCAN3 TX on PE11, RX on PE12 (AF6). */
+    GPIO_InitStruct.Pin = GPIO_PIN_11 | GPIO_PIN_12;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    GPIO_InitStruct.Alternate = GPIO_AF6_FDCAN3;
+    HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
+  }
+}
+
+void HAL_FDCAN_MspDeInit(FDCAN_HandleTypeDef *hfdcan)
+{
+  if (hfdcan->Instance == FDCAN3)
+  {
+    __HAL_RCC_FDCAN_CLK_DISABLE();
+
+    HAL_GPIO_DeInit(GPIOE, GPIO_PIN_11 | GPIO_PIN_12);
   }
 }
 
