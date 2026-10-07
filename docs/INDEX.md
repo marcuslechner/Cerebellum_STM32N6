@@ -11,6 +11,11 @@ Search [st.com](https://www.st.com) by the document number (e.g. `RM0486`) to fi
 - Local datasheet copy: `docs/LSM6DSOX/LSM6DSOX.pdf` (PDF is gitignored)
 - ST reference code location in this repo: `reference/lsm6dsox_STdC`
 
+## ESP32 link
+
+- **USART3 to ESP32** — framed serial link bridging robot data to a Bluetooth app.
+- Local design notes: `docs/esp_link/esp_link.md`
+
 ## Core MCU
 
 - **DS14791 (STM32N657X0H3Q.pdf)** — STM32N6x5xx/STM32N6x7xx datasheet. Main product specification: features, electrical characteristics, package data. Pin descriptions start on page 88.
