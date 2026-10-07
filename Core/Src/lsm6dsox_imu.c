@@ -1,8 +1,9 @@
 #include "lsm6dsox_imu.h"
 
+#include "app_config.h"
+#include "app_debug_log.h"
 #include "main.h"
 
-#include <stdio.h>
 #include <string.h>
 
 #define LSM6DSOX_SPI_TIMEOUT_MS            100U  /* HAL SPI transaction timeout. */
@@ -50,9 +51,11 @@ static void lsm6dsox_cs_deselect(void);
 static void lsm6dsox_app_enable_drdy_irq(void);
 static void lsm6dsox_on_drdy_interrupt(void);
 static uint32_t lsm6dsox_take_drdy_count(void);
+#if DEBUG_IMU
 static int32_t lsm6dsox_accel_raw_to_milli_g(int16_t raw);
 static int32_t lsm6dsox_gyro_raw_to_milli_dps(int16_t raw);
 static void lsm6dsox_print_signed_milli(int32_t milli_value);
+#endif
 
 HAL_StatusTypeDef LSM6DSOX_AppInit(SPI_HandleTypeDef *spi_handle)
 {
@@ -64,7 +67,7 @@ HAL_StatusTypeDef LSM6DSOX_AppInit(SPI_HandleTypeDef *spi_handle)
     uint8_t probe_who_am_i = 0U;
     HAL_StatusTypeDef probe_status = LSM6DSOX_ProbeWhoAmI(spi_handle, &probe_who_am_i);
 
-    printf("LSM6DSOX init failed: init=%d step=%d last_hal=%d who=0x%02X probe=%d probe_who=0x%02X\r\n",
+    AppLog("LSM6DSOX init failed: init=%d step=%d last_hal=%d who=0x%02X probe=%d probe_who=0x%02X\r\n",
            (int)init_status,
            (int)LSM6DSOX_GetLastInitError(),
            (int)LSM6DSOX_GetLastHalStatus(),
@@ -76,7 +79,7 @@ HAL_StatusTypeDef LSM6DSOX_AppInit(SPI_HandleTypeDef *spi_handle)
 
   if ((LSM6DSOX_ReadWhoAmI(&who_am_i) != HAL_OK) || (who_am_i != LSM6DSOX_WHO_AM_I_VALUE))
   {
-    printf("LSM6DSOX WHO_AM_I mismatch: 0x%02X\r\n", who_am_i);
+    AppLog("LSM6DSOX WHO_AM_I mismatch: 0x%02X\r\n", who_am_i);
     return HAL_ERROR;
   }
 
@@ -84,7 +87,7 @@ HAL_StatusTypeDef LSM6DSOX_AppInit(SPI_HandleTypeDef *spi_handle)
 
   if (LSM6DSOX_ReadRawSample(&s_last_sample) != HAL_OK)
   {
-    printf("LSM6DSOX first sample read failed.\r\n");
+    AppLog("LSM6DSOX first sample read failed.\r\n");
     return HAL_ERROR;
   }
 
@@ -93,7 +96,7 @@ HAL_StatusTypeDef LSM6DSOX_AppInit(SPI_HandleTypeDef *spi_handle)
   s_samples_in_window = 0U;
   s_last_report_ms = HAL_GetTick();
 
-  printf("LSM6DSOX bring-up ok. WHO_AM_I=0x%02X\r\n", who_am_i);
+  AppLog("LSM6DSOX bring-up ok. WHO_AM_I=0x%02X\r\n", who_am_i);
   return HAL_OK;
 }
 
@@ -111,7 +114,7 @@ HAL_StatusTypeDef LSM6DSOX_AppProcess(void)
   {
     if (LSM6DSOX_ReadRawSample(&s_last_sample) != HAL_OK)
     {
-      printf("LSM6DSOX sample read failed.\r\n");
+      AppLog("LSM6DSOX sample read failed.\r\n");
       return HAL_ERROR;
     }
     s_has_sample = 1U;
@@ -124,30 +127,31 @@ HAL_StatusTypeDef LSM6DSOX_AppProcess(void)
   {
     s_last_report_ms = now;
     HAL_GPIO_TogglePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin);
-
+    AppLog("Hello World!\r\n");
+#if DEBUG_IMU
     if (s_has_sample != 0U)
     {
-      printf("samples/s=%lu gyro_dps=[", (unsigned long)s_samples_in_window);
+      AppLog("samples/s=%lu gyro_dps=[", (unsigned long)s_samples_in_window);
       lsm6dsox_print_signed_milli(lsm6dsox_gyro_raw_to_milli_dps(s_last_sample.gyro_x));
-      printf(",");
+      AppLog(",");
       lsm6dsox_print_signed_milli(lsm6dsox_gyro_raw_to_milli_dps(s_last_sample.gyro_y));
-      printf(",");
+      AppLog(",");
       lsm6dsox_print_signed_milli(lsm6dsox_gyro_raw_to_milli_dps(s_last_sample.gyro_z));
-      printf("] accel_g=[");
+      AppLog("] accel_g=[");
       lsm6dsox_print_signed_milli(lsm6dsox_accel_raw_to_milli_g(s_last_sample.accel_x));
-      printf(",");
+      AppLog(",");
       lsm6dsox_print_signed_milli(lsm6dsox_accel_raw_to_milli_g(s_last_sample.accel_y));
-      printf(",");
+      AppLog(",");
       lsm6dsox_print_signed_milli(lsm6dsox_accel_raw_to_milli_g(s_last_sample.accel_z));
-      printf("]\r\n");
+      AppLog("]\r\n");
     }
     else
     {
-      printf("samples/s=%lu (waiting for first sample)\r\n", (unsigned long)s_samples_in_window);
+      AppLog("samples/s=%lu (waiting for first sample)\r\n", (unsigned long)s_samples_in_window);
     }
     s_samples_in_window = 0U;
+#endif
   }
-
   return HAL_OK;
 }
 
@@ -341,6 +345,7 @@ static uint32_t lsm6dsox_take_drdy_count(void)
   return pending;
 }
 
+#if DEBUG_IMU
 static int32_t lsm6dsox_accel_raw_to_milli_g(int16_t raw)
 {
   int32_t micro_g = (int32_t)raw * LSM6DSOX_ACCEL_4G_UG_PER_LSB;
@@ -364,7 +369,7 @@ static void lsm6dsox_print_signed_milli(int32_t milli_value)
 
   if (milli_value < 0)
   {
-    printf("-");
+    AppLog("-");
     magnitude = (uint32_t)(-milli_value);
   }
   else
@@ -372,10 +377,11 @@ static void lsm6dsox_print_signed_milli(int32_t milli_value)
     magnitude = (uint32_t)milli_value;
   }
 
-  printf("%lu.%03lu",
+  AppLog("%lu.%03lu",
          (unsigned long)(magnitude / 1000U),
          (unsigned long)(magnitude % 1000U));
 }
+#endif
 
 LSM6DSOX_InitError LSM6DSOX_GetLastInitError(void)
 {

@@ -52,7 +52,7 @@ On the wire, that frame is COBS-encoded and followed by one `0x00` delimiter byt
 - **Multi-byte fields are little-endian.** The ESP32 is also little-endian, so packed structs can be copied directly.
 - **CRC is CRC-16/CCITT-FALSE:** polynomial `0x1021`, initial value `0xFFFF`, no bit reflection, no final XOR. Check value: the ASCII string `123456789` gives `0x29B1`.
 - **COBS** removes every `0x00` from the frame, so `0x00` appears on the wire only as the delimiter. The encoded frame is one byte longer than the unencoded one for frames under 254 bytes.
-- **Sizes:** frames sent today are at most 39 bytes on the wire. Planned frames stay under 254 bytes unencoded. A 256-byte receive buffer covers everything.
+- **Sizes:** frames sent today are at most 102 bytes on the wire (a full `LOG` line). Planned frames stay under 254 bytes unencoded. A 256-byte receive buffer covers everything.
 - **There is no length field.** The delimiter ends the frame, and `type` (plus `info_id` for INFO frames) fixes the expected payload size.
 
 ## 3. Receiving a Frame
@@ -128,7 +128,7 @@ The decoded output is never longer than the encoded input, so an output buffer t
 | `0x01` | `IMU` | STM32 to ESP32 | Implemented |
 | `0x02` | `STATUS` | STM32 to ESP32 | Planned |
 | `0x03` | `INFO` | STM32 to ESP32 | Implemented for `BATTERY_SOC` only |
-| `0x04` | `LOG` | STM32 to ESP32 | Planned |
+| `0x04` | `LOG` | STM32 to ESP32 | Implemented, sent only when the STM32 is built with `UART_DEBUGGING` 0 |
 | `0x10` | `REQ` | ESP32 to STM32 | Planned |
 
 ### 4.1 INFO (`0x03`)
@@ -206,7 +206,7 @@ typedef struct __attribute__((packed))
 
 Sent on change and once a second. The `state` and `fault_flags` values are not defined yet.
 
-### 4.4 LOG (`0x04`, Planned)
+### 4.4 LOG (`0x04`)
 
 Payload:
 
@@ -214,7 +214,9 @@ Payload:
 [level:1][text:N]
 ```
 
-`text` is ASCII, up to about 64 characters, with no null terminator; its length is the payload length minus 1. Level values are not defined yet.
+`text` is one line of ASCII, up to 96 characters, with no null terminator and no line ending; its length is the payload length minus 1. Longer lines are truncated. `level` is always 0 (info) for now; other values are not defined yet.
+
+These are the STM32's debug messages. They are sent only when the STM32 is built with `UART_DEBUGGING` set to 0; otherwise they go to its debug UART and no `LOG` frames appear. `LOG` frames can be dropped by the STM32 when its transmit buffer is busy.
 
 ### 4.5 REQ (`0x10`, Planned, ESP32 to STM32)
 
@@ -241,6 +243,7 @@ What an ESP32 connected today will receive:
 
 - One `IMU` frame per sample, about 833 per second, 22 bytes on the wire.
 - One `INFO` / `BATTERY_SOC` frame per second, 8 bytes on the wire.
+- `LOG` frames for debug messages, if the STM32 is built with `UART_DEBUGGING` 0: a few at start-up and one status line per second.
 - Nothing else.
 - `seq` starts at 0 after an STM32 reset and increases by 1 per frame, across both types.
 - Frames arrive in bursts: several can be sent back to back in one block.
@@ -279,5 +282,5 @@ Counting these makes link problems easy to tell apart:
 
 ## 8. Bluetooth Notes
 
-- A BLE notification carries 20 bytes by default, and up to about 244 with a negotiated MTU. Every frame defined so far except long `LOG` lines fits in 20 bytes unencoded.
+- A BLE notification carries 20 bytes by default, and up to about 244 with a negotiated MTU. Every frame defined so far except `LOG` lines over 15 characters fits in 20 bytes unencoded.
 - The full-rate `IMU` stream is likely too much for a phone BLE connection and may need decimating on the ESP32.

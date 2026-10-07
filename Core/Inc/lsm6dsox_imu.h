@@ -1,10 +1,6 @@
 #ifndef LSM6DSOX_IMU_H
 #define LSM6DSOX_IMU_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <stdbool.h>
 #include <stdint.h>
 #include "stm32n6xx_hal.h"
@@ -47,9 +43,5 @@ HAL_StatusTypeDef LSM6DSOX_ReadRawSample(LSM6DSOX_RawSample *sample);
 LSM6DSOX_InitError LSM6DSOX_GetLastInitError(void);
 HAL_StatusTypeDef LSM6DSOX_GetLastHalStatus(void);
 uint8_t LSM6DSOX_GetLastWhoAmI(void);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif /* LSM6DSOX_IMU_H */

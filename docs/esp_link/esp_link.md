@@ -2,7 +2,7 @@
 
 Design notes for the serial link between the STM32N6 and the ESP32, which bridges robot data to a Bluetooth app.
 
-**Status: IMU stream implemented.** `Core/Src/esp_link.c` streams every IMU sample as an IMU frame and sends one INFO frame, a hardcoded battery SoC of 78%, once a second, at 921600 baud through the ping-pong TX buffers. The IMU stream is always on until subscriptions exist. Everything else here is design: the other message types, receive, subscriptions and the diagnostics counters beyond a single `dropped` count. Once `esp_link_protocol.h` exists, it is the source of truth for message IDs and payload layouts, and this file explains the reasoning.
+**Status: IMU stream implemented.** `Core/Src/esp_link.c` streams every IMU sample as an IMU frame and sends one INFO frame, a hardcoded battery SoC of 78%, once a second, at 921600 baud through the ping-pong TX buffers. The IMU stream is always on until subscriptions exist. Debug messages go out as LOG frames when `UART_DEBUGGING` is 0 (see Build Switches). Everything else here is design: the other message types, receive, subscriptions and the diagnostics counters beyond a single `dropped` count. Once `esp_link_protocol.h` exists, it is the source of truth for message IDs and payload layouts, and this file explains the reasoning.
 
 The packet definition for writing the ESP32 firmware is in `esp_link_protocol.md`.
 
@@ -24,6 +24,17 @@ A full-rate IMU stream is 22 bytes per frame at 833 Hz, about 18.3 kB/s. 115200 
 - Minimum for the full IMU stream: 230400
 - In use: 921600 (about 92 kB/s), set in `MX_USART3_UART_Init()`. From the 100 MHz PCLK the actual rate is 917431 baud, 0.45% low.
 
+## Build Switches
+
+`Core/Inc/app_config.h` holds two 0/1 switches:
+
+| Switch | Effect |
+|---|---|
+| `BLE_TELEMETRY` | 1 runs this link. 0 leaves `EspLink_Init()` and `EspLink_Process()` out of `main.c`, so nothing is sent on USART3. |
+| `UART_DEBUGGING` | 1 sends debug messages as text on USART1. 0 sends them as LOG frames on this link, if `BLE_TELEMETRY` is 1, and otherwise discards them. |
+
+Debug messages are written with `AppLog()` (`Core/Src/app_debug_log.c`), which takes `printf` arguments and picks the destination. On the link it sends one LOG frame per line, without the line ending.
+
 ## Planned Module
 
 - `Core/Inc/esp_link.h`, `Core/Src/esp_link.c` (listed explicitly in `CMakeLists.txt`)
@@ -34,7 +45,7 @@ void EspLink_Init(UART_HandleTypeDef *huart);
 void EspLink_Process(void);   /* main loop, next to LSM6DSOX_AppProcess() */
 bool EspLink_Send(uint8_t type, const void *payload, uint16_t len);   /* false = dropped */
 bool EspLink_SendInfo(EspLink_InfoId id, const void *data, uint8_t len);
-void EspLink_Log(uint8_t level, const char *fmt, ...);
+bool EspLink_SendLog(uint8_t level, const char *text, uint8_t len);
 ```
 
 Nothing in the module blocks. All sends are expected from the main loop; if a send is ever made from an ISR, the buffer append must be inside the critical section as well as the kick.
@@ -155,7 +166,7 @@ The ESP32 forwards INFO frames to the app without interpreting them, so a new `i
 
 ### LOG (`0x04`)
 
-Payload is `[level:1][text:N]`, with no null terminator. `EspLink_Log` formats with `vsnprintf` into a local buffer capped at about 64 characters and truncates beyond that. Logs are droppable.
+Payload is `[level:1][text:N]`, with no null terminator. `EspLink_SendLog` takes text that is already formatted and truncates it at 96 characters (`ESP_LINK_MAX_LOG_TEXT`); the formatting is done by `AppLog()`. The only level so far is `ESP_LOG_LEVEL_INFO` (0). Logs are droppable.
 
 ### REQ (`0x10`)
 

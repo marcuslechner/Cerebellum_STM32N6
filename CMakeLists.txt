@@ -21,6 +21,7 @@ add_executable(${PROJECT_NAME}
   Core/Src/main.c
   Core/Src/lsm6dsox_imu.c
   Core/Src/esp_link.c
+  Core/Src/app_debug_log.c
   Core/Src/stm32n6xx_hal_msp.c
   Core/Src/stm32n6xx_it.c
   Core/Src/system_stm32n6xx_fsbl.c
@@ -66,6 +67,7 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
 
 target_compile_options(${PROJECT_NAME} PRIVATE
   -mcmse
+  -Wundef
   $<$<CONFIG:Debug>:-Og>
   $<$<CONFIG:Debug>:-g3>
   $<$<CONFIG:Release>:-Os>
@@ -73,6 +75,7 @@ target_compile_options(${PROJECT_NAME} PRIVATE
 
 target_link_options(${PROJECT_NAME} PRIVATE
   -mcmse
+  -Wundef
   -T${LINKER_SCRIPT}
   -Wl,-Map=${CMAKE_BINARY_DIR}/${PROJECT_NAME}.map
   -Wl,--print-memory-usage

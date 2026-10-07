@@ -83,7 +83,7 @@ first we will start with IMU data
 #define ESP_LINK_TX_BUF_SIZE        256U  /* Each ping-pong buffer; must stay a multiple of the 32-byte cache line. */
 #define ESP_LINK_STREAM_FILL_LIMIT  192U  /* Stream frames may fill 75%; the rest is kept for INFO/STATUS frames. */
 #define ESP_LINK_MAX_INFO_DATA      32U   /* Largest INFO data field; keeps a frame under one COBS block. */
-#define ESP_LINK_MAX_PAYLOAD        (ESP_LINK_MAX_INFO_DATA + 1U) /* info_id + data is the largest payload. */
+#define ESP_LINK_MAX_PAYLOAD        (ESP_LINK_MAX_LOG_TEXT + 1U) /* level + text is the largest payload. */
 #define ESP_LINK_FRAME_OVERHEAD     4U    /* type + seq + crc16. */
 #define ESP_LINK_FRAME_DELIMITER    0x00U /* Ends every COBS-encoded frame. */
 #define ESP_LINK_IRQ_PRIORITY       5U    /* USART3 and GPDMA1 channel 0 priority, set in main.c and the MSP. */
@@ -165,6 +165,26 @@ bool EspLink_SendInfo(EspLink_InfoId id, const void *data, uint8_t len)
   memcpy(&payload[1], data, len);
 
   return esp_link_send(ESP_MSG_INFO, payload, (uint16_t)(len + 1U), false);
+}
+
+bool EspLink_SendLog(uint8_t level, const char *text, uint8_t len)
+{
+  uint8_t payload[ESP_LINK_MAX_PAYLOAD];
+
+  if ((text == NULL) || (len == 0U))
+  {
+    return false;
+  }
+
+  if (len > ESP_LINK_MAX_LOG_TEXT)
+  {
+    len = ESP_LINK_MAX_LOG_TEXT;
+  }
+
+  payload[0] = level;
+  memcpy(&payload[1], text, len);
+
+  return esp_link_send(ESP_MSG_LOG, payload, (uint16_t)(len + 1U), true);
 }
 
 uint32_t EspLink_GetDroppedCount(void)

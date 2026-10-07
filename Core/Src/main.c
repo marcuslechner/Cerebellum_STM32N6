@@ -24,6 +24,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
+#include "app_config.h"
+#include "app_debug_log.h"
 #include "lsm6dsox_imu.h"
 #include "esp_link.h"
 
@@ -164,14 +166,18 @@ int main(void)
   SystemIsolation_Config();
   /* USER CODE BEGIN 2 */
   setvbuf(stdout, NULL, _IONBF, 0);
-  printf("UART debug ready.\r\n");
+
+  /* The link comes up first so start-up messages can go out as LOG frames. */
+#if BLE_TELEMETRY
+  EspLink_Init(&huart3);
+#endif
+
+  AppLog("Debug log ready.\r\n");
 
   if (LSM6DSOX_AppInit(&hspi5) != HAL_OK)
   {
     Error_Handler();
   }
-
-  EspLink_Init(&huart3);
 
   /* USER CODE END 2 */
 
@@ -187,7 +193,9 @@ int main(void)
       Error_Handler();
     }
 
+#if BLE_TELEMETRY
     EspLink_Process();
+#endif
   }
   /* USER CODE END 3 */
 }
