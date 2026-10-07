@@ -78,36 +78,70 @@ first we will start with IMU data
 
 #include <string.h>
 
-#define ESP_LINK_TX_BUF_SIZE        64U   /* Must stay a multiple of the 32-byte cache line. */
+#include "lsm6dsox_imu.h"
+
+#define ESP_LINK_TX_BUF_SIZE        256U  /* Each ping-pong buffer; must stay a multiple of the 32-byte cache line. */
+#define ESP_LINK_STREAM_FILL_LIMIT  192U  /* Stream frames may fill 75%; the rest is kept for INFO/STATUS frames. */
 #define ESP_LINK_MAX_INFO_DATA      32U   /* Largest INFO data field; keeps a frame under one COBS block. */
-#define ESP_LINK_FRAME_OVERHEAD     5U    /* type + seq + info_id + crc16. */
+#define ESP_LINK_MAX_PAYLOAD        (ESP_LINK_MAX_INFO_DATA + 1U) /* info_id + data is the largest payload. */
+#define ESP_LINK_FRAME_OVERHEAD     4U    /* type + seq + crc16. */
 #define ESP_LINK_FRAME_DELIMITER    0x00U /* Ends every COBS-encoded frame. */
+#define ESP_LINK_IRQ_PRIORITY       5U    /* USART3 and GPDMA1 channel 0 priority, set in main.c and the MSP. */
 
 #define ESP_LINK_BATTERY_PERIOD_MS  1000U /* How often the battery SoC is sent. */
 #define ESP_LINK_FAKE_BATTERY_SOC   78U   /* Placeholder percent until a real battery reading exists. */
 
+_Static_assert(sizeof(EspLink_ImuPayload) == 16U, "EspLink_ImuPayload must be 16 bytes");
+
 static UART_HandleTypeDef *s_huart = NULL;
-static uint8_t s_tx_buf[ESP_LINK_TX_BUF_SIZE] __attribute__((aligned(32)));
+static uint8_t s_tx_bufs[2][ESP_LINK_TX_BUF_SIZE] __attribute__((aligned(32)));
+static volatile uint8_t s_fill_idx = 0U;   /* Which buffer frames are appended to; the other is with the DMA. */
+static volatile uint16_t s_fill_len = 0U;
 static volatile uint8_t s_tx_busy = 0U;
 static uint8_t s_seq = 0U;
-static uint32_t s_dropped = 0U;
+static volatile uint32_t s_dropped = 0U;
 static uint32_t s_last_battery_ms = 0U;
+static uint32_t s_last_imu_idx = 0U;
 
+static bool esp_link_send(uint8_t type, const void *payload, uint16_t len, bool droppable);
+static void esp_link_kick(void);
 static uint16_t esp_link_crc16(const uint8_t *data, uint16_t len);
 static uint16_t esp_link_cobs_encode(const uint8_t *in, uint16_t len, uint8_t *out);
 
 void EspLink_Init(UART_HandleTypeDef *huart)
 {
   s_huart = huart;
+  s_fill_idx = 0U;
+  s_fill_len = 0U;
   s_tx_busy = 0U;
   s_seq = 0U;
   s_dropped = 0U;
   s_last_battery_ms = HAL_GetTick();
+  s_last_imu_idx = 0U;
 }
 
 void EspLink_Process(void)
 {
   uint32_t now = HAL_GetTick();
+  LSM6DSOX_RawSample sample;
+  uint32_t sample_idx = 0U;
+
+  /* Stream every new IMU sample. sample_idx jumps when the main loop missed samples. */
+  if (LSM6DSOX_AppGetLatestSample(&sample, &sample_idx) && (sample_idx != s_last_imu_idx))
+  {
+    EspLink_ImuPayload imu;
+
+    imu.sample_idx = sample_idx;
+    imu.gyro_x = sample.gyro_x;
+    imu.gyro_y = sample.gyro_y;
+    imu.gyro_z = sample.gyro_z;
+    imu.accel_x = sample.accel_x;
+    imu.accel_y = sample.accel_y;
+    imu.accel_z = sample.accel_z;
+
+    s_last_imu_idx = sample_idx;
+    (void)esp_link_send(ESP_MSG_IMU, &imu, sizeof(imu), true);
+  }
 
   if ((now - s_last_battery_ms) >= ESP_LINK_BATTERY_PERIOD_MS)
   {
@@ -120,50 +154,17 @@ void EspLink_Process(void)
 
 bool EspLink_SendInfo(EspLink_InfoId id, const void *data, uint8_t len)
 {
-  uint8_t raw[ESP_LINK_MAX_INFO_DATA + ESP_LINK_FRAME_OVERHEAD];
-  uint16_t raw_len = 0U;
-  uint16_t enc_len;
-  uint16_t crc;
+  uint8_t payload[ESP_LINK_MAX_PAYLOAD];
 
-  if ((s_huart == NULL) || (data == NULL) || (len == 0U) || (len > ESP_LINK_MAX_INFO_DATA))
+  if ((data == NULL) || (len == 0U) || (len > ESP_LINK_MAX_INFO_DATA))
   {
     return false;
   }
 
-  /* Single TX buffer for now: a frame that arrives mid-transfer is dropped. */
-  if (s_tx_busy != 0U)
-  {
-    s_dropped++;
-    return false;
-  }
+  payload[0] = (uint8_t)id;
+  memcpy(&payload[1], data, len);
 
-  raw[raw_len++] = ESP_MSG_INFO;
-  raw[raw_len++] = s_seq;
-  raw[raw_len++] = (uint8_t)id;
-  memcpy(&raw[raw_len], data, len);
-  raw_len += len;
-
-  crc = esp_link_crc16(raw, raw_len);
-  raw[raw_len++] = (uint8_t)(crc & 0xFFU);
-  raw[raw_len++] = (uint8_t)(crc >> 8);
-
-  enc_len = esp_link_cobs_encode(raw, raw_len, s_tx_buf);
-  s_tx_buf[enc_len++] = ESP_LINK_FRAME_DELIMITER;
-
-  /* The DMA reads RAM, not the D-Cache, so push the frame out to RAM first. */
-  SCB_CleanDCache_by_Addr((uint32_t *)s_tx_buf, (int32_t)sizeof(s_tx_buf));
-
-  s_tx_busy = 1U;
-  if (HAL_UART_Transmit_DMA(s_huart, s_tx_buf, enc_len) != HAL_OK)
-  {
-    s_tx_busy = 0U;
-    s_dropped++;
-    return false;
-  }
-
-  /* seq only advances for frames that were actually sent. */
-  s_seq++;
-  return true;
+  return esp_link_send(ESP_MSG_INFO, payload, (uint16_t)(len + 1U), false);
 }
 
 uint32_t EspLink_GetDroppedCount(void)
@@ -176,6 +177,7 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
   if (huart == s_huart)
   {
     s_tx_busy = 0U;
+    esp_link_kick();
   }
 }
 
@@ -184,6 +186,88 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
   if (huart == s_huart)
   {
     s_tx_busy = 0U;
+    esp_link_kick();
+  }
+}
+
+/* Frames the payload and appends it to the fill buffer. Main loop only. Returns false if dropped. */
+static bool esp_link_send(uint8_t type, const void *payload, uint16_t len, bool droppable)
+{
+  uint8_t raw[ESP_LINK_MAX_PAYLOAD + ESP_LINK_FRAME_OVERHEAD];
+  uint8_t wire[sizeof(raw) + 2U];   /* + COBS overhead byte + delimiter. */
+  uint16_t raw_len = 0U;
+  uint16_t wire_len;
+  uint16_t fill_limit = droppable ? ESP_LINK_STREAM_FILL_LIMIT : ESP_LINK_TX_BUF_SIZE;
+  uint16_t crc;
+  uint32_t basepri;
+  bool queued = false;
+
+  if ((s_huart == NULL) || (payload == NULL) || (len == 0U) || (len > ESP_LINK_MAX_PAYLOAD))
+  {
+    return false;
+  }
+
+  raw[raw_len++] = type;
+  raw[raw_len++] = s_seq;
+  memcpy(&raw[raw_len], payload, len);
+  raw_len += len;
+
+  crc = esp_link_crc16(raw, raw_len);
+  raw[raw_len++] = (uint8_t)(crc & 0xFFU);
+  raw[raw_len++] = (uint8_t)(crc >> 8);
+
+  wire_len = esp_link_cobs_encode(raw, raw_len, wire);
+  wire[wire_len++] = ESP_LINK_FRAME_DELIMITER;
+
+  /* Hold off only the link interrupts while the buffers are touched; the IMU EXTI at priority 0 still runs. */
+  basepri = __get_BASEPRI();
+  __set_BASEPRI(ESP_LINK_IRQ_PRIORITY << (8U - __NVIC_PRIO_BITS));
+
+  if ((s_fill_len + wire_len) <= fill_limit)
+  {
+    memcpy(&s_tx_bufs[s_fill_idx][s_fill_len], wire, wire_len);
+    s_fill_len += wire_len;
+    /* seq only advances for frames that were actually queued. */
+    s_seq++;
+    queued = true;
+  }
+  else
+  {
+    s_dropped++;
+  }
+
+  esp_link_kick();
+
+  __set_BASEPRI(basepri);
+
+  return queued;
+}
+
+/* Swaps the buffers and sends the filled one if the DMA is idle. Call with the link interrupts held off, or from one. */
+static void esp_link_kick(void)
+{
+  uint8_t *buf;
+  uint16_t len;
+
+  if ((s_tx_busy != 0U) || (s_fill_len == 0U))
+  {
+    return;
+  }
+
+  buf = s_tx_bufs[s_fill_idx];
+  len = s_fill_len;
+  s_fill_idx ^= 1U;
+  s_fill_len = 0U;
+
+  /* The DMA reads RAM, not the D-Cache, so push the frames out to RAM first. */
+  SCB_CleanDCache_by_Addr((uint32_t *)buf, (int32_t)ESP_LINK_TX_BUF_SIZE);
+
+  s_tx_busy = 1U;
+  if (HAL_UART_Transmit_DMA(s_huart, buf, len) != HAL_OK)
+  {
+    /* The whole block is lost; the ESP32 sees it as a seq gap. */
+    s_tx_busy = 0U;
+    s_dropped++;
   }
 }
 

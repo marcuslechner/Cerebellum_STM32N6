@@ -36,6 +36,7 @@ static uint8_t s_last_who_am_i = 0U;
 
 static LSM6DSOX_RawSample s_last_sample = {0};
 static uint8_t s_has_sample = 0U;
+static uint32_t s_sample_idx = 0U;   /* Counts data-ready events, so it keeps time even when reads are missed. */
 static uint32_t s_samples_in_window = 0U;
 static uint32_t s_last_report_ms = 0U;
 
@@ -88,6 +89,7 @@ HAL_StatusTypeDef LSM6DSOX_AppInit(SPI_HandleTypeDef *spi_handle)
   }
 
   s_has_sample = 1U;
+  s_sample_idx = 0U;
   s_samples_in_window = 0U;
   s_last_report_ms = HAL_GetTick();
 
@@ -113,6 +115,7 @@ HAL_StatusTypeDef LSM6DSOX_AppProcess(void)
       return HAL_ERROR;
     }
     s_has_sample = 1U;
+    s_sample_idx++;
     s_samples_in_window++;
     pending_drdy--;
   }
@@ -146,6 +149,18 @@ HAL_StatusTypeDef LSM6DSOX_AppProcess(void)
   }
 
   return HAL_OK;
+}
+
+bool LSM6DSOX_AppGetLatestSample(LSM6DSOX_RawSample *sample, uint32_t *sample_idx)
+{
+  if ((sample == NULL) || (sample_idx == NULL) || (s_has_sample == 0U))
+  {
+    return false;
+  }
+
+  *sample = s_last_sample;
+  *sample_idx = s_sample_idx;
+  return true;
 }
 
 void LSM6DSOX_AppHandleGpioExti(uint16_t GPIO_Pin)

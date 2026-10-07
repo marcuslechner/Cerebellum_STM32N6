@@ -21,6 +21,17 @@ typedef enum
   ESP_INFO_PID_PARAMS  = 0x03
 } EspLink_InfoId;
 
+typedef struct __attribute__((packed))
+{
+  uint32_t sample_idx;   /* IMU sample counter; time = idx / 833 Hz */
+  int16_t  gyro_x;       /* raw LSB, same as LSM6DSOX_RawSample */
+  int16_t  gyro_y;
+  int16_t  gyro_z;
+  int16_t  accel_x;
+  int16_t  accel_y;
+  int16_t  accel_z;
+} EspLink_ImuPayload;    /* 16 bytes, 22 on the wire */
+
 void EspLink_Init(UART_HandleTypeDef *huart);
 void EspLink_Process(void);
 bool EspLink_SendInfo(EspLink_InfoId id, const void *data, uint8_t len);

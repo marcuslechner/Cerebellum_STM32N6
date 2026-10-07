@@ -2,7 +2,7 @@
 
 Design notes for the serial link between the STM32N6 and the ESP32, which bridges robot data to a Bluetooth app.
 
-**Status: first step implemented.** `Core/Src/esp_link.c` sends one INFO frame, a hardcoded battery SoC of 78%, once a second at 115200 baud, using a single TX buffer (a frame arriving mid-transfer is dropped). Everything else here is design: ping-pong buffers, the other message types, receive and subscriptions. Once `esp_link_protocol.h` exists, it is the source of truth for message IDs and payload layouts, and this file explains the reasoning.
+**Status: IMU stream implemented.** `Core/Src/esp_link.c` streams every IMU sample as an IMU frame and sends one INFO frame, a hardcoded battery SoC of 78%, once a second, at 921600 baud through the ping-pong TX buffers. The IMU stream is always on until subscriptions exist. Everything else here is design: the other message types, receive, subscriptions and the diagnostics counters beyond a single `dropped` count. Once `esp_link_protocol.h` exists, it is the source of truth for message IDs and payload layouts, and this file explains the reasoning.
 
 The packet definition for writing the ESP32 firmware is in `esp_link_protocol.md`.
 
@@ -19,10 +19,10 @@ Source: `cubemx-reference/CANandESP/CANandESP.ioc`, `Core/Src/stm32n6xx_hal_msp.
 
 ### Baud rate budget
 
-Currently 115200 baud, which carries about 11.5 kB/s. A full-rate IMU stream is 22 bytes per frame at 833 Hz, about 18.3 kB/s, so it does not fit.
+A full-rate IMU stream is 22 bytes per frame at 833 Hz, about 18.3 kB/s. 115200 baud carries about 11.5 kB/s, so it does not fit.
 
 - Minimum for the full IMU stream: 230400
-- Proposed: 921600 (about 92 kB/s), comfortable for both ends from the 100 MHz PCLK
+- In use: 921600 (about 92 kB/s), set in `MX_USART3_UART_Init()`. From the 100 MHz PCLK the actual rate is 917431 baud, 0.45% low.
 
 ## Planned Module
 
@@ -220,7 +220,7 @@ Run each once to prove the detection works before trusting zeros:
 
 ## Open Items
 
-- Final baud rate (proposed 921600).
+- Final baud rate (921600 in use, to be confirmed against the ESP32).
 - Motor fields and units, to match what the motor controller reports.
 - BLE limits: a notification carries 20 bytes by default (up to about 244 with a negotiated MTU), so log lines may need splitting on the ESP32. The full 833 Hz IMU stream is likely too much for a phone BLE connection and may need decimating on the ESP32 or keeping off Bluetooth.
 - Whether any message needs a delivery guarantee beyond the periodic STATUS resend, which would require an ack frame.

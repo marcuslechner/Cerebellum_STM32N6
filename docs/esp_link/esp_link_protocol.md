@@ -11,7 +11,7 @@ Each section is marked with what the STM32 firmware does today:
 
 | Setting | Value |
 |---|---|
-| Baud rate | 115200 (planned increase to 921600) |
+| Baud rate | 921600 |
 | Format | 8 data bits, no parity, 1 stop bit |
 | Flow control | None |
 | Idle level | High |
@@ -125,7 +125,7 @@ The decoded output is never longer than the encoded input, so an output buffer t
 
 | `type` | Name | Direction | State |
 |---|---|---|---|
-| `0x01` | `IMU` | STM32 to ESP32 | Planned |
+| `0x01` | `IMU` | STM32 to ESP32 | Implemented |
 | `0x02` | `STATUS` | STM32 to ESP32 | Planned |
 | `0x03` | `INFO` | STM32 to ESP32 | Implemented for `BATTERY_SOC` only |
 | `0x04` | `LOG` | STM32 to ESP32 | Planned |
@@ -165,7 +165,7 @@ typedef struct __attribute__((packed))
 
 The ESP32 can forward an INFO frame to the app without interpreting `data`.
 
-### 4.2 IMU (`0x01`, Planned)
+### 4.2 IMU (`0x01`)
 
 ```c
 typedef struct __attribute__((packed))
@@ -185,7 +185,9 @@ Scale factors for the configured ranges (±2000 dps, ±4 g):
 - Gyro: 70 mdps per count
 - Accel: 0.122 mg per count
 
-At the full 833 Hz this is about 18.3 kB/s, so it will not be enabled until the baud rate is raised.
+One frame per IMU sample, 22 bytes on the wire, about 18.3 kB/s at the full 833 Hz. The stream is always on; there is no way to turn it off until `REQ` exists.
+
+`sample_idx` counts sensor data-ready events, not frames. It normally increases by 1. A larger step means the STM32 did not read or could not queue those samples; the sample time is still `sample_idx / 833 Hz`. A few samples are skipped once a second while the STM32 prints its debug report.
 
 ### 4.3 STATUS (`0x02`, Planned)
 
@@ -237,13 +239,15 @@ Payload:
 
 What an ESP32 connected today will receive:
 
+- One `IMU` frame per sample, about 833 per second, 22 bytes on the wire.
 - One `INFO` / `BATTERY_SOC` frame per second, 8 bytes on the wire.
 - Nothing else.
-- `seq` starts at 0 after an STM32 reset and increases by 1 per frame.
+- `seq` starts at 0 after an STM32 reset and increases by 1 per frame, across both types.
+- Frames arrive in bursts: several can be sent back to back in one block.
 
 ## 6. Test Vectors
 
-The first three frames after an STM32 reset, battery SoC 78 (`0x4E`):
+`INFO` / `BATTERY_SOC` frames, battery SoC 78 (`0x4E`):
 
 | `seq` | Unencoded frame | On the wire |
 |---|---|---|
@@ -254,6 +258,13 @@ The first three frames after an STM32 reset, battery SoC 78 (`0x4E`):
 Reading the unencoded frame for `seq` 1: `03` is INFO, `01` is the sequence number, `01` is `BATTERY_SOC`, `4E` is 78%, and `17 B2` is the CRC `0xB217` low byte first.
 
 The `seq` 0 frame looks different on the wire because its sequence byte is `0x00`, which COBS encodes away.
+
+An `IMU` frame, `seq` 0, `sample_idx` 1, gyro (10, -20, 0), accel (-123, 45, 8197):
+
+| | Bytes |
+|---|---|
+| Unencoded | `01 00 01 00 00 00 0A 00 EC FF 00 00 85 FF 2D 00 05 20 4D DC` |
+| On the wire | `02 01 02 01 01 01 02 0A 03 EC FF 01 04 85 FF 2D 05 05 20 4D DC 00` |
 
 ## 7. Suggested ESP32 Diagnostics
 

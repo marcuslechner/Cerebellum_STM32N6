@@ -5,6 +5,7 @@
 extern "C" {
 #endif
 
+#include <stdbool.h>
 #include <stdint.h>
 #include "stm32n6xx_hal.h"
 
@@ -38,6 +39,7 @@ typedef struct
 HAL_StatusTypeDef LSM6DSOX_Init(SPI_HandleTypeDef *spi_handle);
 HAL_StatusTypeDef LSM6DSOX_AppInit(SPI_HandleTypeDef *spi_handle);
 HAL_StatusTypeDef LSM6DSOX_AppProcess(void);
+bool LSM6DSOX_AppGetLatestSample(LSM6DSOX_RawSample *sample, uint32_t *sample_idx);
 void LSM6DSOX_AppHandleGpioExti(uint16_t GPIO_Pin);
 HAL_StatusTypeDef LSM6DSOX_ReadWhoAmI(uint8_t *who_am_i);
 HAL_StatusTypeDef LSM6DSOX_ProbeWhoAmI(SPI_HandleTypeDef *spi_handle, uint8_t *who_am_i);
