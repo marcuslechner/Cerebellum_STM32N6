@@ -156,17 +156,27 @@ Then attach from VS Code using the manual configuration, which connects to `loca
 - Live Watch traffic such as `var-update --all-values *` with `^done,changelist=[]` is normal and only means the debugger is polling watched values.
 - Source-level stepping, register inspection, memory inspection, and breakpoints work as expected.
 
+**Console output: `printf()` over UART through the ST-LINK USB connector**
+
+`printf()` is retargeted to USART1 (`__io_putchar` in `Core/Src/main.c`), which on the NUCLEO-N657X0-Q is wired to the on-board ST-LINK's Virtual COM Port (TX on PE5, RX on PE6). The ST-LINK bridges that UART to USB, so the log comes out of the same USB connector used for SWD — no extra cable or USB-serial adapter is needed. On Linux it enumerates as `/dev/ttyACM0`.
+
+Open it with any serial terminal at 115200 8N1, no flow control:
+
+```bash
+picocom -b 115200 /dev/ttyACM0
+```
+
+- Exit picocom with `Ctrl-A` then `Ctrl-X`.
+- The port is independent of the GDB session, so it can stay open while debugging, across reloads and resets.
+- If the device number differs (other ACM devices plugged in), check `ls /dev/ttyACM*` or `dmesg | tail` after plugging the board in.
+- A permission error on open usually means your user is not in the `dialout` group: `sudo usermod -aG dialout $USER`, then log out and back in.
+- Output only starts after `MX_USART1_UART_Init()` has run; anything printed before that falls back to ITM and is not visible (see below).
+
 **Known limitation: no SWO/ITM console output in the current setup**
 
 - The project can compile `printf()` routed through ITM, but in the current VS Code setup there is no visible SWO output path.
 - The installed `marus25.cortex-debug` extension does not currently provide SWO capture for the ST-LINK GDB server path we are using.
-- As a result, `printf("Hello world!")` sent through ITM is not expected to appear in the VS Code Debug Console or terminal with the current configuration.
-
-**Recommended next steps**
-
-- Keep the current dev-boot workflow for code loading, stepping, and bring-up.
-- Treat SWO/ITM text output as unavailable in this exact tool combination until the debugger stack changes.
-- When console-style firmware logging becomes important, evaluate a dedicated output path separately from this debug flow: semihosting, UART, or a debugger/server combination with confirmed SWO support on STM32N6.
+- As a result, `printf("Hello world!")` sent through ITM is not expected to appear in the VS Code Debug Console or terminal with the current configuration. Use the UART console above instead.
 
 ### Changing Pin/Peripheral Configuration
 

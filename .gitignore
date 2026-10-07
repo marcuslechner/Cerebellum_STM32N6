@@ -106,6 +106,7 @@ cubemx-reference/**
 !cubemx-reference/
 !cubemx-reference/*/
 !cubemx-reference/**/*.ioc
+!cubemx-reference/README.md
 
 # ----- Third-party reference code (downloaded locally, don't push) -----
 reference/

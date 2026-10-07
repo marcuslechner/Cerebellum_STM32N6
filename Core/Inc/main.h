@@ -106,6 +106,13 @@ void Error_Handler(void);
 #define IMU_INT_GPIO_Port GPIOD
 #endif
 
+/* External SMPS mode select (PWR_LP): low = nominal 0.81 V, high = overdrive 0.89 V */
+#ifndef SMPS_PWR_LP_Pin
+#define SMPS_PWR_LP_Pin GPIO_PIN_12
+#define SMPS_PWR_LP_GPIO_Port GPIOB
+#define SMPS_PWR_LP_GPIO_CLK_ENABLE() __HAL_RCC_GPIOB_CLK_ENABLE()
+#endif
+
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

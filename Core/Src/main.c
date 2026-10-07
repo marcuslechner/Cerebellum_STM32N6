@@ -58,6 +58,7 @@ static void MX_GPIO_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_SPI5_Init(void);
 /* USER CODE BEGIN PFP */
+static void SMPS_SetOverdrive(void);
 
 /* USER CODE END PFP */
 
@@ -74,6 +75,28 @@ int __io_putchar(int ch)
   }
 
   return (int)ITM_SendChar((uint32_t)ch);
+}
+
+/**
+  * @brief  Switch the NUCLEO external SMPS to overdrive (VDDCORE = 0.89 V).
+  *         Must run before SystemClock_Config() raises the CPU clock above 600 MHz.
+  */
+static void SMPS_SetOverdrive(void)
+{
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+  SMPS_PWR_LP_GPIO_CLK_ENABLE();
+
+  GPIO_InitStruct.Pin = SMPS_PWR_LP_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+  HAL_GPIO_Init(SMPS_PWR_LP_GPIO_Port, &GPIO_InitStruct);
+
+  HAL_GPIO_WritePin(SMPS_PWR_LP_GPIO_Port, SMPS_PWR_LP_Pin, GPIO_PIN_SET);
+
+  /* Let VDDCORE settle before the clock is raised */
+  HAL_Delay(2);
 }
 
 /* USER CODE END 0 */
@@ -109,6 +132,9 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
+
+  /* Set voltage to overdrive mode to enable 800 MHz CPU clock */
+  SMPS_SetOverdrive();
 
   /* USER CODE END Init */
 
@@ -153,21 +179,21 @@ int main(void)
 /*         The system Clock is configured as follows :
               CPU Clock source               = IC1_CK
               System bus Clock source        = IC2_IC6_IC11_CK
-              CPUCLK (sysa_ck) (Hz)          = 600000000
+              CPUCLK (sysa_ck) (Hz)          = 800000000
               SYSCLK AXI (sysb_ck) (Hz)      = 400000000
-              SYSCLK NPU (sysc_ck) (Hz)      = 300000000
+              SYSCLK NPU (sysc_ck) (Hz)      = 200000000
               SYSCLK AXISRAM3/4/5/6 (sysd_ck) (Hz) = 400000000
-              HCLKx(Hz)                      = 200000000
-              PCLKx(Hz)                      = 200000000
-              AHB Prescaler                  = 2
+              HCLKx(Hz)                      = 100000000
+              PCLKx(Hz)                      = 100000000
+              AHB Prescaler                  = 4
               APB1 Prescaler                 = 1
               APB2 Prescaler                 = 1
               APB4 Prescaler                 = 1
               APB5 Prescaler                 = 1
               PLL1 State                     = ON
               PLL1 clock source              = HSI
-              PLL1 M                         = 4
-              PLL1 N                         = 75
+              PLL1 M                         = 8
+              PLL1 N                         = 100
               PLL1 P1                        = 1
               PLL1 P2                        = 1
               PLL1 FRACN                     = 0
@@ -198,7 +224,7 @@ void SystemClock_Config(void)
 
   /** Configure the main internal regulator output voltage
   */
-  if (HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1) != HAL_OK)
+  if (HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE0) != HAL_OK)
   {
     Error_Handler();
   }
@@ -244,8 +270,8 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_NONE;
   RCC_OscInitStruct.PLL1.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL1.PLLSource = RCC_PLLSOURCE_HSI;
-  RCC_OscInitStruct.PLL1.PLLM = 4;
-  RCC_OscInitStruct.PLL1.PLLN = 75;
+  RCC_OscInitStruct.PLL1.PLLM = 8;
+  RCC_OscInitStruct.PLL1.PLLN = 100;
   RCC_OscInitStruct.PLL1.PLLFractional = 0;
   RCC_OscInitStruct.PLL1.PLLP1 = 1;
   RCC_OscInitStruct.PLL1.PLLP2 = 1;
@@ -265,19 +291,19 @@ void SystemClock_Config(void)
                               |RCC_CLOCKTYPE_PCLK4;
   RCC_ClkInitStruct.CPUCLKSource = RCC_CPUCLKSOURCE_IC1;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_IC2_IC6_IC11;
-  RCC_ClkInitStruct.AHBCLKDivider = RCC_HCLK_DIV2;
+  RCC_ClkInitStruct.AHBCLKDivider = RCC_HCLK_DIV4;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_APB1_DIV1;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_APB2_DIV1;
   RCC_ClkInitStruct.APB4CLKDivider = RCC_APB4_DIV1;
   RCC_ClkInitStruct.APB5CLKDivider = RCC_APB5_DIV1;
   RCC_ClkInitStruct.IC1Selection.ClockSelection = RCC_ICCLKSOURCE_PLL1;
-  RCC_ClkInitStruct.IC1Selection.ClockDivider = 2;
+  RCC_ClkInitStruct.IC1Selection.ClockDivider = 1;
   RCC_ClkInitStruct.IC2Selection.ClockSelection = RCC_ICCLKSOURCE_PLL1;
-  RCC_ClkInitStruct.IC2Selection.ClockDivider = 3;
+  RCC_ClkInitStruct.IC2Selection.ClockDivider = 2;
   RCC_ClkInitStruct.IC6Selection.ClockSelection = RCC_ICCLKSOURCE_PLL1;
   RCC_ClkInitStruct.IC6Selection.ClockDivider = 4;
   RCC_ClkInitStruct.IC11Selection.ClockSelection = RCC_ICCLKSOURCE_PLL1;
-  RCC_ClkInitStruct.IC11Selection.ClockDivider = 3;
+  RCC_ClkInitStruct.IC11Selection.ClockDivider = 2;
 
   if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct) != HAL_OK)
   {
