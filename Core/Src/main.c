@@ -25,6 +25,7 @@
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
 #include "lsm6dsox_imu.h"
+#include "esp_link.h"
 
 /* USER CODE END Includes */
 
@@ -46,6 +47,7 @@
 /* Private variables ---------------------------------------------------------*/
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart3;
+DMA_HandleTypeDef handle_GPDMA1_Channel0;
 
 SPI_HandleTypeDef hspi5;
 
@@ -57,7 +59,9 @@ FDCAN_HandleTypeDef hfdcan3;
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
+static void SystemIsolation_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_GPDMA1_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_SPI5_Init(void);
 static void MX_FDCAN3_Init(void);
@@ -152,10 +156,12 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_GPDMA1_Init();
   MX_USART1_UART_Init();
   MX_SPI5_Init();
   MX_FDCAN3_Init();
   MX_USART3_UART_Init();
+  SystemIsolation_Config();
   /* USER CODE BEGIN 2 */
   setvbuf(stdout, NULL, _IONBF, 0);
   printf("UART debug ready.\r\n");
@@ -164,6 +170,8 @@ int main(void)
   {
     Error_Handler();
   }
+
+  EspLink_Init(&huart3);
 
   /* USER CODE END 2 */
 
@@ -178,6 +186,8 @@ int main(void)
     {
       Error_Handler();
     }
+
+    EspLink_Process();
   }
   /* USER CODE END 3 */
 }
@@ -316,6 +326,19 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief GPDMA1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_GPDMA1_Init(void)
+{
+  __HAL_RCC_GPDMA1_CLK_ENABLE();
+
+  HAL_NVIC_SetPriority(GPDMA1_Channel0_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(GPDMA1_Channel0_IRQn);
 }
 
 /**
@@ -533,6 +556,24 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
+}
+
+/**
+  * @brief RIF Initialization Function
+  * @param None
+  * @retval None
+  */
+static void SystemIsolation_Config(void)
+{
+  __HAL_RCC_RIFSC_CLK_ENABLE();
+
+  /* GPDMA1 channel 0 (USART3 TX) runs secure privileged, like the rest of the FSBL. */
+  if (HAL_DMA_ConfigChannelAttributes(&handle_GPDMA1_Channel0,
+                                      DMA_CHANNEL_SEC | DMA_CHANNEL_PRIV |
+                                      DMA_CHANNEL_SRC_SEC | DMA_CHANNEL_DEST_SEC) != HAL_OK)
+  {
+    Error_Handler();
+  }
 }
 
 /* USER CODE BEGIN 4 */

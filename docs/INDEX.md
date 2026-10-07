@@ -15,6 +15,7 @@ Search [st.com](https://www.st.com) by the document number (e.g. `RM0486`) to fi
 
 - **USART3 to ESP32** — framed serial link bridging robot data to a Bluetooth app.
 - Local design notes: `docs/esp_link/esp_link.md`
+- Packet definition for the ESP32 firmware: `docs/esp_link/esp_link_protocol.md`
 
 ## Core MCU
 

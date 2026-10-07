@@ -2,7 +2,9 @@
 
 Design notes for the serial link between the STM32N6 and the ESP32, which bridges robot data to a Bluetooth app.
 
-**Status: design only.** The USART3 and DMA init is in place; the `esp_link` module described here is not written yet. Once `esp_link_protocol.h` exists, it is the source of truth for message IDs and payload layouts, and this file explains the reasoning.
+**Status: first step implemented.** `Core/Src/esp_link.c` sends one INFO frame, a hardcoded battery SoC of 78%, once a second at 115200 baud, using a single TX buffer (a frame arriving mid-transfer is dropped). Everything else here is design: ping-pong buffers, the other message types, receive and subscriptions. Once `esp_link_protocol.h` exists, it is the source of truth for message IDs and payload layouts, and this file explains the reasoning.
+
+The packet definition for writing the ESP32 firmware is in `esp_link_protocol.md`.
 
 ## Hardware Configuration
 
@@ -24,7 +26,7 @@ Currently 115200 baud, which carries about 11.5 kB/s. A full-rate IMU stream is 
 
 ## Planned Module
 
-- `Application/Inc/esp_link.h`, `Application/Src/esp_link.c` (CMake already globs `Application/Src/*.c`)
+- `Core/Inc/esp_link.h`, `Core/Src/esp_link.c` (listed explicitly in `CMakeLists.txt`)
 - `esp_link_protocol.h`: message IDs and packed payload structs, shared with the ESP32 project
 
 ```c
@@ -77,7 +79,7 @@ Before encoding:
 Then COBS-encoded and terminated with a `0x00` delimiter. Wire cost is payload + 6 bytes for frames under 254 bytes.
 
 - `seq`: one counter for the link, across all types. Assigned only when a frame is successfully appended, so a gap seen by the ESP32 means loss on the wire, not a drop at the source.
-- CRC: CRC-16/CCITT over `type`, `seq` and payload, low byte first.
+- CRC: CRC-16/CCITT-FALSE (poly `0x1021`, init `0xFFFF`, no reflection, no final XOR) over `type`, `seq` and payload, low byte first.
 - No length field: the delimiter ends the frame, and the receiver rejects a frame whose decoded length does not match its type.
 - Byte order: little-endian on both ends, so packed structs are copied directly. Each payload struct gets a `_Static_assert` on its size.
 
