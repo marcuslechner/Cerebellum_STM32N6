@@ -23,4 +23,7 @@ HAL_StatusTypeDef HDW_CAN_Init(FDCAN_HandleTypeDef *hfdcan, uint16_t filter_id, 
 /* Takes the oldest received frame. Returns false when there is none. Call from the main loop. */
 bool HDW_CAN_Receive(HDW_CAN_Frame *frame);
 
+/* Queues a standard data frame. Returns an error when the TX FIFO is full; the frame is then dropped. */
+HAL_StatusTypeDef HDW_CAN_Transmit(const HDW_CAN_Frame *frame);
+
 #endif /* HDW_CAN_H */

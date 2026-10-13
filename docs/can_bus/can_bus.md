@@ -2,7 +2,7 @@
 
 Wiring and configuration notes for the CAN bus between the STM32N6 and the GIM6010-8 motors.
 
-**Status: bus started, receive only.** `HDW_CAN_Init()` (`Core/Src/HDW_CAN.c`) sets the receive filter and starts FDCAN3; `APP_MOTOR.c` listens for the heartbeat of one motor. Receive is polled from RX FIFO 0 in the main loop, so no FDCAN interrupt source is enabled. Transmit is not written yet. The transceiver wiring and termination below are the plan; they have not been built or tested.
+**Status: bus started, receive and transmit.** `HDW_CAN_Init()` (`Core/Src/HDW_CAN.c`) sets the receive filter and starts FDCAN3; `APP_MOTOR.c` listens for the heartbeat of one motor. Receive is polled from RX FIFO 0 in the main loop, so no FDCAN interrupt source is enabled. Transmit queues frames in the TX FIFO. With `MOTOR_VEL_TEST` set in `app_config.h`, `APP_MOTOR.c` puts the motor in ramped velocity control and runs it at `APP_MOTOR_TEST_OUTPUT_REV_S` (output shaft rev/s, converted to rotor turn/s with the 8:1 ratio). The transceiver wiring and termination below are the plan; they have not been built or tested.
 
 ## Why classic CAN, not CAN FD
 
