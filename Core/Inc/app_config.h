@@ -7,6 +7,7 @@
 #define UART_DEBUGGING  1   /* Debug messages as text on USART1 (ST-LINK virtual COM port). */
 #define DEBUG_IMU       0   /* Once-a-second IMU sample report in the debug log. */
 #define DEBUG_CAN       1   /* Every CAN frame sent and received in the debug log. */
-#define MOTOR_VEL_TEST  1   /* Spin the motor at APP_MOTOR_TEST_OUTPUT_REV_S as soon as it is online. */
+#define MOTOR_VEL_TEST  0   /* Spin the motor at APP_MOTOR_TEST_OUTPUT_REV_S as soon as it is online. */
+#define MOTOR_SWEEP_TEST 1  /* Move back and forth between the APP_MOTOR_SWEEP_ positions. Needs MOTOR_VEL_TEST 0. */
 
 #endif /* APP_CONFIG_H */
