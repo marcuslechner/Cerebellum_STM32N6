@@ -10,6 +10,7 @@ Receives wheel position instructions from main system via USB.
 - Language: C
 - Build: CubeMX `.ioc` + CMake + Ninja + `arm-none-eabi-gcc`
 - Flash/debug: STM32CubeProgrammer (flash), OpenOCD + Cortex-Debug (debug)
+- Motor bus: FDCAN3 (PE11/PE12), classic CAN at 1 Mbit/s, MCP2562FD transceiver — see `docs/can_bus/can_bus.md`
 - ESP32 link: USART3 (PD8/PD9), DMA TX, COBS-framed with CRC-16 — see `docs/esp_link/esp_link.md`
 - AI toolchain: STM32Cube AI Studio (STEDGEAI-CUBEAI, standalone) — X-CUBE-AI's successor; targets Neural-ART NPU via ST Edge AI Core
 

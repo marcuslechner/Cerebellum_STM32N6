@@ -17,6 +17,11 @@ Search [st.com](https://www.st.com) by the document number (e.g. `RM0486`) to fi
 - Local design notes: `docs/esp_link/esp_link.md`
 - Packet definition for the ESP32 firmware: `docs/esp_link/esp_link_protocol.md`
 
+## CAN bus
+
+- **FDCAN3 to GIM6010-8 motors** — classic CAN at 1 Mbit/s through an MCP2562FD transceiver.
+- Wiring, termination and configuration notes: `docs/can_bus/can_bus.md`
+
 ## Core MCU
 
 - **DS14791 (STM32N657X0H3Q.pdf)** — STM32N6x5xx/STM32N6x7xx datasheet. Main product specification: features, electrical characteristics, package data. Pin descriptions start on page 88.

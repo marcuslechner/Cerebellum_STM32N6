@@ -28,6 +28,7 @@
 #include "app_debug_log.h"
 #include "lsm6dsox_imu.h"
 #include "esp_link.h"
+#include "APP_MOTOR.h"
 
 /* USER CODE END Includes */
 
@@ -179,6 +180,11 @@ int main(void)
     Error_Handler();
   }
 
+  if (APP_MOTOR_Init(&hfdcan3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -192,6 +198,8 @@ int main(void)
     {
       Error_Handler();
     }
+
+    APP_MOTOR_Process();
 
 #if BLE_TELEMETRY
     EspLink_Process();

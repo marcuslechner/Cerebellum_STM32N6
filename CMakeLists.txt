@@ -22,6 +22,8 @@ add_executable(${PROJECT_NAME}
   Core/Src/lsm6dsox_imu.c
   Core/Src/esp_link.c
   Core/Src/app_debug_log.c
+  Core/Src/HDW_CAN.c
+  Core/Src/APP_MOTOR.c
   Core/Src/stm32n6xx_hal_msp.c
   Core/Src/stm32n6xx_it.c
   Core/Src/system_stm32n6xx_fsbl.c
