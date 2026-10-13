@@ -196,6 +196,9 @@ void HAL_FDCAN_MspInit(FDCAN_HandleTypeDef *hfdcan)
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
     GPIO_InitStruct.Alternate = GPIO_AF6_FDCAN3;
     HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
+
+    HAL_NVIC_SetPriority(FDCAN3_IT0_IRQn, 0, 0);
+    HAL_NVIC_EnableIRQ(FDCAN3_IT0_IRQn);
   }
 }
 
@@ -206,6 +209,8 @@ void HAL_FDCAN_MspDeInit(FDCAN_HandleTypeDef *hfdcan)
     __HAL_RCC_FDCAN_CLK_DISABLE();
 
     HAL_GPIO_DeInit(GPIOE, GPIO_PIN_11 | GPIO_PIN_12);
+
+    HAL_NVIC_DisableIRQ(FDCAN3_IT0_IRQn);
   }
 }
 
